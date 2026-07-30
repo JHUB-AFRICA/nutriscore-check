@@ -1,6 +1,173 @@
-import{c as m,u as e,b as p,d as s,h as f}from"./index-BAt1XuiS.js";/**
- * @license lucide-react v0.487.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */const y=[["path",{d:"M3 3v16a2 2 0 0 0 2 2h16",key:"c24i48"}],["path",{d:"M18 17V9",key:"2bz60n"}],["path",{d:"M13 17V5",key:"1frdt8"}],["path",{d:"M8 17v-3",key:"17ska0"}]],g=m("chart-column",y);function b({siteActive:r,siteName:o,scoredCount:n,onOpenDashboard:i}){return e("div",{className:"overflow-hidden rounded-xl bg-white",style:{width:"max-content",minWidth:280,maxWidth:360},children:[e("div",{className:"flex items-center gap-2 px-4 pb-3 pt-4",children:[e("div",{className:"grid size-8 place-items-center rounded-lg",style:{backgroundColor:"var(--ns-grade-a)",color:"#fff"},children:e("span",{style:{fontWeight:700},children:"N"})}),e("div",{children:[e("p",{style:{fontWeight:600,fontSize:"0.95rem"},children:"NutriScore"}),e("p",{style:{fontSize:"0.72rem",color:"var(--muted-foreground)"},children:"Checkout Tool · NUT-04"})]})]}),e("div",{className:"mx-4 flex items-center gap-2 rounded-lg bg-[#f6f7f9] px-3 py-2",children:[e("span",{className:r?"ns-pulse":"",style:{width:10,height:10,borderRadius:"50%",backgroundColor:r?"var(--ns-grade-a)":"var(--muted-foreground)"},"aria-hidden":!0}),e("span",{style:{fontSize:"0.82rem"},children:r?`Active on ${o}`:"Not a supported store"})]}),e("div",{className:"mx-4 mt-3 flex items-center justify-between rounded-lg border border-black/5 px-3 py-2.5",children:[e("span",{style:{fontSize:"0.82rem",color:"var(--muted-foreground)"},children:"Items scored on this page"}),e("span",{style:{fontWeight:700,fontSize:"1.05rem"},children:n})]}),e("div",{className:"p-4",children:e("button",{type:"button",onClick:i,className:"flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-white transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black",style:{backgroundColor:"var(--primary)"},children:[e(g,{size:16,"aria-hidden":!0}),e("span",{style:{fontSize:"0.88rem"},children:"View Shopping Analytics"})]})})]})}function v(){const[r,o]=s(!1),[n,i]=s(""),[c,d]=s(0);return f(()=>{typeof chrome<"u"&&chrome.tabs&&chrome.tabs.query({active:!0,currentWindow:!0},l=>{const t=l[0];if(t!=null&&t.id&&t.url){const u=new URL(t.url);chrome.tabs.sendMessage(t.id,{action:"GET_PAGE_STATS"},a=>{if(chrome.runtime.lastError)o(!1);else if(a){o(!0);const h=u.hostname.replace("www.","");i(h),d(a.count||0)}})}})},[]),e(b,{siteActive:r,siteName:n,scoredCount:c,onOpenDashboard:()=>chrome.runtime.openOptionsPage()})}p(document.getElementById("root")).render(e(v,{}));
+// popup.js — vanilla JS version of the popup logic (no build step required)
+
+document.addEventListener("DOMContentLoaded", () => {
+  const statusDot = document.getElementById("statusDot");
+  const statusText = document.getElementById("statusText");
+  const scoreCount = document.getElementById("scoreCount");
+
+  const signInBtn = document.getElementById("signInBtn");
+  const accountSignedIn = document.getElementById("accountSignedIn");
+  const signOutBtn = document.getElementById("signOutBtn");
+  const accountEmail = document.getElementById("accountEmail");
+  const avatarImg = document.getElementById("avatarImg");
+  const avatarFallback = document.getElementById("avatarFallback");
+
+  const dashboardBtn = document.getElementById("dashboardBtn");
+  const healthDetailsBtn = document.getElementById("healthDetailsBtn");
+  const healthDetailsPanel = document.getElementById("healthDetailsPanel");
+  let healthPanelOpen = false;
+  let currentHealthProfile = null;
+
+  function renderSiteStatus(active, siteName) {
+    statusDot.classList.toggle("active", !!active);
+    statusText.textContent = active ? `Active on ${siteName}` : "Not a supported store";
+  }
+
+  function renderScoreCount(count) {
+    scoreCount.textContent = count || 0;
+  }
+
+  function renderAccount(user) {
+    if (user) {
+      signInBtn.hidden = true;
+      accountSignedIn.hidden = false;
+      accountEmail.textContent = user.email || "";
+
+      if (user.picture) {
+        avatarImg.src = user.picture;
+        avatarImg.hidden = false;
+        avatarFallback.hidden = true;
+      } else {
+        avatarFallback.textContent = (user.email || "?")[0].toUpperCase();
+        avatarFallback.hidden = false;
+        avatarImg.hidden = true;
+      }
+    } else {
+      signInBtn.hidden = false;
+      accountSignedIn.hidden = true;
+      healthDetailsBtn.classList.remove("has-data");
+      currentHealthProfile = null;
+      healthPanelOpen = false;
+      healthDetailsPanel.style.display = "none";
+    }
+  }
+
+  function formatList(items) {
+    if (!items || items.length === 0) return "None selected";
+    return items
+      .map((v) => v.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()))
+      .join(", ");
+  }
+
+  function renderHealthProfile(health) {
+    healthDetailsBtn.classList.toggle("has-data", !!health);
+    currentHealthProfile = health;
+
+    if (healthPanelOpen) {
+      paintHealthPanel();
+    }
+  }
+
+  function renderChipGroup(label, items) {
+    const chips =
+      items && items.length
+        ? items
+            .map(
+              (v) =>
+                `<span style="display:inline-block; padding:3px 10px; border-radius:999px; background:var(--accent-soft); color:var(--accent); font-size:0.74rem; font-weight:700; margin:2px 4px 2px 0;">${v
+                  .replace(/-/g, " ")
+                  .replace(/\b\w/g, (c) => c.toUpperCase())}</span>`
+            )
+            .join("")
+        : '<span style="color:var(--muted);">None selected</span>';
+
+    return `<div style="margin-bottom:10px;">
+      <p style="margin:0 0 6px; font-weight:700; color:var(--text); font-size:0.78rem;">${label}</p>
+      <div>${chips}</div>
+    </div>`;
+  }
+
+  function paintHealthPanel() {
+    if (!currentHealthProfile) {
+      healthDetailsPanel.innerHTML =
+        '<p style="margin:0; color:var(--muted);">No health details saved yet. Add them on the NutriScore website and they\'ll show up here.</p>';
+      return;
+    }
+
+    healthDetailsPanel.innerHTML =
+      renderChipGroup("Health conditions", currentHealthProfile.conditions) +
+      renderChipGroup("Dietary preferences", currentHealthProfile.dietaryPreferences);
+  }
+
+  // --- Site status + scored count ---------------------------------------
+  if (typeof chrome !== "undefined" && chrome.tabs) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs[0];
+      if (!tab || !tab.id || !tab.url) return;
+
+      const url = new URL(tab.url);
+      chrome.tabs.sendMessage(tab.id, { action: "GET_PAGE_STATS" }, (res) => {
+        if (chrome.runtime.lastError) {
+          renderSiteStatus(false);
+          return;
+        }
+        if (res) {
+          const hostname = url.hostname.replace("www.", "");
+          renderSiteStatus(true, hostname);
+          renderScoreCount(res.count || 0);
+        }
+      });
+    });
+  }
+
+  // --- Account state on load ----------------------------------------------
+  if (typeof chrome !== "undefined" && chrome.runtime) {
+    chrome.runtime.sendMessage({ action: "GET_SIGNED_IN_USER" }, (res) => {
+      if (res && res.status === "SUCCESS" && res.data) {
+        renderAccount(res.data);
+      }
+    });
+
+    chrome.runtime.sendMessage({ action: "GET_HEALTH_PROFILE" }, (res) => {
+      if (res && res.status === "SUCCESS") {
+        renderHealthProfile(res.data);
+      }
+    });
+  }
+
+  // --- Sign in / out --------------------------------------------------------
+  // Sign-in happens directly in the extension via launchWebAuthFlow, which
+  // opens Google's own account picker — see signInWithGooglePicker() in
+  // background.js.
+  signInBtn.addEventListener("click", () => {
+    chrome.runtime.sendMessage({ action: "SIGN_IN" }, (res) => {
+      if (res && res.status === "SUCCESS") {
+        renderAccount(res.data);
+      } else {
+        console.error("Sign-in failed:", res && res.error);
+      }
+    });
+  });
+
+  signOutBtn.addEventListener("click", () => {
+    chrome.runtime.sendMessage({ action: "SIGN_OUT" }, (res) => {
+      if (res && res.status === "SUCCESS") {
+        renderAccount(null);
+      }
+    });
+  });
+
+  // --- Health details --------------------------------------------------------
+  healthDetailsBtn.addEventListener("click", () => {
+    healthPanelOpen = !healthPanelOpen;
+    healthDetailsPanel.style.display = healthPanelOpen ? "block" : "none";
+    if (healthPanelOpen) {
+      paintHealthPanel();
+    }
+  });
+
+  // --- Dashboard --------------------------------------------------------
+  dashboardBtn.addEventListener("click", () => {
+    chrome.runtime.openOptionsPage();
+  });
+});

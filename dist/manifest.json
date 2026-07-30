@@ -6,14 +6,23 @@
   "permissions": [
     "storage",
     "activeTab",
-    "scripting"
+    "scripting",
+    "identity"
   ],
   "host_permissions": [
     "*://*.naivas.online/*",
     "*://*.naivas.co.ke/*",
     "*://*.carrefour.ke/*",
-    "*://*.carrefourkenya.com/*"
+    "*://*.carrefourkenya.com/*",
+    "https://nutriscore-check.vercel.app/*"
   ],
+  "oauth2": {
+    "client_id": "923932588057-vrp3kj4qlg0lvsak0gg0is2ndc8p4pbt.apps.googleusercontent.com",
+    "scopes": ["openid", "email", "profile"]
+  },
+  "externally_connectable": {
+    "matches": ["https://nutriscore-check.vercel.app/*"]
+  },
   "background": {
     "service_worker": "background.js"
   },
