@@ -1,24 +1,23 @@
-<<<<<<< HEAD
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# NutriScore Checkout Tool (Kenya)
 
-# Run and deploy your AI Studio app
+A Chrome extension (Manifest V3) that helps shoppers check NutriScore ratings at checkout on Kenyan grocery retailer sites, paired with a companion web app.
 
-This contains everything you need to run your app locally.
+## Overview
 
-View your app in AI Studio: https://ai.studio/apps/0c0d1630-976c-4fe2-afd1-2c1fb8c098c9
+This project consists of two connected components:
 
-## Run Locally
+- **Browser Extension** — "NutriScore Checkout Tool (Kenya)", built on Manifest V3, designed to surface NutriScore information while checking out on **Naivas** and **Carrefour Kenya** online stores.
+- **Website** — [nutriscore-check.vercel.app](https://nutriscore-check.vercel.app), which works alongside the extension.
 
-**Prerequisites:**  Node.js
+The extension and website are linked together via:
+- **Google OAuth** (using a client ID) for authentication
+- **Extension messaging** via `externally_connectable`, allowing the website to communicate directly with the extension
 
+## Repository
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
-=======
-# NutriScore Checkout Tool
->>>>>>> bd7bd1a59575c3ee172bb2fe0d47c83e05fbb83b
+- Repo name: `nutriscore-check`
+- Hosted across two collaborating GitHub accounts: `robinwanyoa7` and `JHUB-AFRICA`
+
+## License
+
+_Not yet specified._
