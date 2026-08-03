@@ -14,7 +14,10 @@
     "*://*.naivas.co.ke/*",
     "*://*.carrefour.ke/*",
     "*://*.carrefourkenya.com/*",
-    "https://nutriscore-check.vercel.app/*"
+    "https://nutriscore-check.vercel.app/*",
+    "https://identitytoolkit.googleapis.com/*",
+    "https://securetoken.googleapis.com/*",
+    "https://firestore.googleapis.com/*"
   ],
   "oauth2": {
     "client_id": "923932588057-vrp3kj4qlg0lvsak0gg0is2ndc8p4pbt.apps.googleusercontent.com",

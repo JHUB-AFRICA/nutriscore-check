@@ -449,6 +449,15 @@ function init() {
   if (signUpButton) {
     signUpButton.addEventListener('click', signUpWithGoogle);
   }
+
+  // The extension popup can no longer sign in on its own (see background.js
+  // openSignInTab) — it opens this page with ?prompt=signin instead, so the
+  // website's own Firebase sign-in flow runs and pushes the result back to
+  // the extension via syncAccountToExtension()/AUTH_SYNC once it completes.
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('prompt') === 'signin') {
+    signInWithGoogle();
+  }
   if (signOutButton) {
     signOutButton.addEventListener('click', signOutUser);
   }
