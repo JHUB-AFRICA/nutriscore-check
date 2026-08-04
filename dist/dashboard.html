@@ -4,12 +4,75 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NutriScore Dashboard</title>
-    <style>html, body { margin: 0; padding: 0; height: 100vh; }</style>
+    <style>
+      html, body { margin: 0; padding: 0; height: 100vh; }
+
+      /* Manual fallback for the auto-reload listener below, in case a
+         message ever gets missed (tab was backgrounded, etc). Sits
+         outside the React root so it works no matter what's rendered. */
+      #ns-reload-btn {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        z-index: 99999;
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        border: 1.5px solid rgba(15, 23, 42, 0.08);
+        background: #fff;
+        color: #617083;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+        transition: border-color 0.15s ease, color 0.15s ease;
+      }
+      #ns-reload-btn:hover {
+        border-color: #16a34a;
+        color: #16a34a;
+      }
+      #ns-reload-btn svg {
+        width: 16px;
+        height: 16px;
+      }
+      #ns-reload-btn.spinning svg {
+        animation: ns-dash-spin 0.7s linear infinite;
+      }
+      @keyframes ns-dash-spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+    </style>
     <script type="module" crossorigin src="/assets/dashboard-BD5L4IdJ.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/index-BAt1XuiS.js">
     <link rel="stylesheet" crossorigin href="/assets/index-HTjAKQ8_.css">
   </head>
   <body>
     <div id="root"></div>
+
+    <button id="ns-reload-btn" type="button" title="Reload dashboard data" aria-label="Reload dashboard data">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+    </button>
+
+    <script>
+      // The dashboard bundle reads shopping_ledger once on load and has
+      // no way to know when new data arrives from a cart-page scan
+      // elsewhere -- background.js broadcasts SHOPPING_LEDGER_UPDATED
+      // after each successful log, so this tab can refresh itself
+      // automatically. The button above is a manual fallback (e.g. if
+      // this tab was backgrounded when the message went out).
+      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
+        chrome.runtime.onMessage.addListener((msg) => {
+          if (msg && msg.action === "SHOPPING_LEDGER_UPDATED") {
+            location.reload();
+          }
+        });
+      }
+
+      document.getElementById("ns-reload-btn").addEventListener("click", (e) => {
+        e.currentTarget.classList.add("spinning");
+        location.reload();
+      });
+    </script>
   </body>
 </html>
