@@ -12,6 +12,9 @@ class NutriScoreContentEngine {
     this.processedElements = new Set();
     this.observer     = null;
     this.debounceTimer = null;
+    // Guards against re-logging the same cart line item if the retailer's
+    // page re-renders the DOM (e.g. on quantity change) within one visit.
+    this.loggedThisSession = new Set();
   }
 
   init() {
@@ -118,6 +121,34 @@ class NutriScoreContentEngine {
             // Delegate all UI rendering to the adapter (no logic here)
             const shadowRoot = this.adapter.injectBadge(card, product, prodInfo.price);
             if (shadowRoot) this.activeFlyouts.add(shadowRoot);
+
+            // If we're on the actual cart page (not just browsing a
+            // listing), a successful scan here means this item IS in
+            // the cart -- log it straight to history. Row shape below
+            // is matched exactly to what the dashboard's compiled
+            // bundle reads from shopping_ledger (flat sodiumMg/
+            // sugarsG/satFatG fields, not nested; name/category/grade
+            // for the table; addedAt for sorting).
+            if (this.adapter.isCartPage && this.adapter.isCartPage()) {
+              const logKey = product.productId || prodInfo.id || prodInfo.name;
+              if (logKey && !this.loggedThisSession.has(logKey)) {
+                this.loggedThisSession.add(logKey);
+                const nutrition = product.nutritional_profile_display || {};
+                chrome.runtime.sendMessage({
+                  action: "LOG_CART_EVENT",
+                  payload: {
+                    id:       `${logKey}-${Date.now()}`,
+                    addedAt:  Date.now(),
+                    name:     product.product_name || prodInfo.name,
+                    category: product.fsaCategory || "GENERAL_FOOD",
+                    grade:    product.nutriscore_grade,
+                    sodiumMg: Number(nutrition.sodium_mg) || 0,
+                    sugarsG:  Number(nutrition.sugars_g)  || 0,
+                    satFatG:  Number(nutrition.sat_fat_g) || 0
+                  }
+                });
+              }
+            }
           } else {
             card.setAttribute("data-nutriscore-scanned", "not-found");
             if (cacheKey) this.notFoundCache.add(cacheKey);

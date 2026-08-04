@@ -10,15 +10,35 @@ const CarrefourAdapter = {
     return "CARREFOUR";
   },
 
+  // Confirmed real container id for the "My Cart" list -- also reused
+  // by detectProducts()/getObserveTarget() to scope badging away from
+  // the Best Sellers carousel. content.js uses this to decide whether
+  // a successful scan should be logged to shopping history.
+  isCartPage() {
+    return !!document.getElementById("entries-SLOTTED");
+  },
+
   getObserveTarget() {
-    return document.querySelector("[data-testid='product-grid']") || document.querySelector(".css-19y7shm")?.parentElement || document.body;
+    return document.getElementById("entries-SLOTTED")
+      || document.querySelector("[data-testid='product-grid']")
+      || document.querySelector(".css-19y7shm")?.parentElement
+      || document.body;
   },
 
   detectProducts() {
     const products = [];
 
+    // On the cart page, "My Cart" line items live inside a confirmed
+    // real container (id="entries-SLOTTED") -- scoping detection to
+    // just that excludes the "Best Sellers" upsell carousel and
+    // anything else on the page that also happens to contain product
+    // links. Falls back to a full-page search when that container
+    // isn't present (i.e. everywhere that isn't the cart page).
+    const cartList = document.getElementById("entries-SLOTTED");
+    const searchRoot = cartList || document;
+
     // Most robust way: find ALL product links first. A product link is an anchor containing "/p/" or "/product/".
-    const productLinks = document.querySelectorAll("a[href*='/p/'], a[href*='/product/']");
+    const productLinks = searchRoot.querySelectorAll("a[href*='/p/'], a[href*='/product/']");
     const processedCards = new Set();
 
     productLinks.forEach(anchor => {
@@ -85,8 +105,38 @@ const CarrefourAdapter = {
     return products;
   },
 
+  // Climbs up from a detected product element to find the actual
+  // full-width row/card container. detectProducts() sometimes matches
+  // a narrower inner wrapper (e.g. just the image+name column) rather
+  // than the whole card, which would anchor the badge too far from
+  // the row's real edge -- but on grid listing pages, climbing too far
+  // would land on the entire grid instead of one tile. Growth is
+  // capped both in absolute width and per-step ratio so it stops at a
+  // single row/card either way.
+  findRowAnchor(el, maxWidth = 700, maxStepRatio = 2.5) {
+    let bestNode = el;
+    let bestWidth = el.getBoundingClientRect().width;
+    let node = el;
+    for (let i = 0; i < 6 && node && node !== document.body; i++) {
+      const parent = node.parentElement;
+      if (!parent) break;
+      const parentWidth = parent.getBoundingClientRect().width;
+      if (parentWidth > maxWidth || parentWidth > bestWidth * maxStepRatio) break;
+      bestNode = parent;
+      bestWidth = parentWidth;
+      node = parent;
+    }
+    return bestNode;
+  },
+
   // ── Shared UI renderer (same design as NaivasAdapter) ──────────────────
   injectBadge(card, productResult, price) {
+    const anchorEl = this.findRowAnchor(card);
+    if (anchorEl !== card) {
+      const currentPosition = getComputedStyle(anchorEl).position;
+      if (currentPosition === "static") anchorEl.style.position = "relative";
+    }
+
     const badgeContainer = document.createElement("div");
     badgeContainer.className  = "nutriscore-isolated-root";
     badgeContainer.style.cssText = "position:absolute;top:8px;right:8px;z-index:1000;";
@@ -153,14 +203,13 @@ const CarrefourAdapter = {
       .badge-trigger{
         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
         background:var(--ns-bg);color:var(--ns-txt);
-        font-weight:800;font-size:11px;letter-spacing:.5px;
-        padding:3px 8px;border-radius:4px;
+        font-weight:800;font-size:15px;
+        width:32px;height:32px;border-radius:10px;
         box-shadow:0 2px 6px rgba(0,0,0,.2);
-        cursor:pointer;display:inline-flex;align-items:center;gap:5px;
+        cursor:pointer;display:grid;place-items:center;
         transition:transform .15s;user-select:none;
       }
       .badge-trigger:hover{transform:scale(1.05)}
-      .badge-grade{font-size:15px;font-weight:900}
       .flyout{
         display:none;position:absolute;top:calc(100% + 6px);left:0;
         width:268px;background:#fff;border-radius:10px;
@@ -211,10 +260,7 @@ const CarrefourAdapter = {
     shadow.adoptedStyleSheets = [this.sharedStyleSheet];
 
     shadow.innerHTML = `
-      <div class="badge-trigger" style="--ns-bg: ${info.bg}; --ns-txt: ${info.txt};">
-        <span class="badge-grade">${grade}</span>
-        <span>NutriScore</span>
-      </div>
+      <div class="badge-trigger" style="--ns-bg: ${info.bg}; --ns-txt: ${info.txt};" title="NutriScore ${grade} — ${info.label}">${grade}</div>
       <div class="flyout">
         <button class="ns-close" style="display:none"></button>
         <div class="ns-header" style="--ns-bg: ${info.bg}; --ns-txt: ${info.txt};">
@@ -240,8 +286,7 @@ const CarrefourAdapter = {
 
     // Force relative positioning without reading computed style to avoid Layout Thrashing
     card.setAttribute("data-nutriscore-id", productResult.productId || "");
-    card.style.position = "relative";
-    card.appendChild(badgeContainer);
+    anchorEl.appendChild(badgeContainer);
     return shadow;
   },
 

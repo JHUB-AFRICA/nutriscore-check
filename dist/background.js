@@ -416,7 +416,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "LOG_CART_EVENT") {
     if (typeof NutriScoreDB !== "undefined" && NutriScoreDB.logCartEvent) {
       NutriScoreDB.logCartEvent(message.payload)
-        .then(() => sendResponse({ status: "SUCCESS" }))
+        .then(() => {
+          sendResponse({ status: "SUCCESS" });
+          // Let any open dashboard tab know there's new data, so it can
+          // refresh itself without the person needing to manually
+          // reload (the dashboard is a separate page that only reads
+          // IndexedDB once on load, so it has no other way to know).
+          chrome.runtime.sendMessage({ action: "SHOPPING_LEDGER_UPDATED" }).catch(() => {
+            // No dashboard tab currently open/listening -- fine, ignore.
+          });
+        })
         .catch(err => sendResponse({ status: "ERROR", error: err.message }));
     } else {
       sendResponse({ status: "ERROR", error: "DB not initialized" });
