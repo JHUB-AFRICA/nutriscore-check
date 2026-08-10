@@ -229,6 +229,7 @@ var NutriScoreDB = (() => {
     importDatasets: () => importDatasets,
     logCartEvent: () => logCartEvent,
     purgeAll: () => purgeAll,
+    removeCartEventsByProductId: () => removeCartEventsByProductId,
     resolveDisplayCategory: () => resolveDisplayCategory,
     resolveProductMatch: () => resolveProductMatch,
     saveProduct: () => saveProduct,
@@ -540,6 +541,19 @@ var NutriScoreDB = (() => {
   async function logCartEvent(row) {
     const db = await getDB();
     await db.put("shopping_ledger", row);
+  }
+  // Cart line-item ids are stored as `${productId}-${timestamp}` (see
+  // content.js), so there's no direct keyPath lookup for "everything
+  // logged for this product" -- scan the (typically small, session-sized)
+  // store and match by prefix instead of adding a new index/DB version
+  // bump just for this.
+  async function removeCartEventsByProductId(productId) {
+    if (!productId) return 0;
+    const db = await getDB();
+    const all = await db.getAll("shopping_ledger");
+    const matches = all.filter(row => typeof row.id === "string" && row.id.startsWith(`${productId}-`));
+    await Promise.all(matches.map(row => db.delete("shopping_ledger", row.id)));
+    return matches.length;
   }
   async function getAllEntries() {
     const db = await getDB();

@@ -54,25 +54,5 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
     </button>
 
-    <script>
-      // The dashboard bundle reads shopping_ledger once on load and has
-      // no way to know when new data arrives from a cart-page scan
-      // elsewhere -- background.js broadcasts SHOPPING_LEDGER_UPDATED
-      // after each successful log, so this tab can refresh itself
-      // automatically. The button above is a manual fallback (e.g. if
-      // this tab was backgrounded when the message went out).
-      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
-        chrome.runtime.onMessage.addListener((msg) => {
-          if (msg && msg.action === "SHOPPING_LEDGER_UPDATED") {
-            location.reload();
-          }
-        });
-      }
-
-      document.getElementById("ns-reload-btn").addEventListener("click", (e) => {
-        e.currentTarget.classList.add("spinning");
-        location.reload();
-      });
-    </script>
   </body>
 </html>
