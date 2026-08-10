@@ -53,7 +53,7 @@ const CarrefourAdapter = {
 
       if (!card) card = anchor.parentElement;
       if (!card || processedCards.has(card)) return;
-      if (card.hasAttribute("data-nutriscore-scanned")) return;
+      if (card.hasAttribute("data-nutriscore-scanned") && !this.isCartPage()) return;
 
       processedCards.add(card);
 
@@ -131,6 +131,12 @@ const CarrefourAdapter = {
 
   // ── Shared UI renderer (same design as NaivasAdapter) ──────────────────
   injectBadge(card, productResult, price) {
+    // On the cart page a card can be re-verified on every mutation (see
+    // content.js reconcileCart) even when it already has a badge -- clear
+    // any prior one first so re-verification updates in place instead of
+    // stacking duplicates.
+    card.querySelectorAll(".nutriscore-isolated-root").forEach(el => el.remove());
+
     const anchorEl = this.findRowAnchor(card);
     if (anchorEl !== card) {
       const currentPosition = getComputedStyle(anchorEl).position;

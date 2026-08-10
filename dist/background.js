@@ -432,6 +432,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     return true;
   }
+
+  if (message.action === "REMOVE_CART_EVENT") {
+    if (typeof NutriScoreDB !== "undefined" && NutriScoreDB.removeCartEventsByProductId) {
+      NutriScoreDB.removeCartEventsByProductId(message.payload && message.payload.productId)
+        .then((removedCount) => {
+          sendResponse({ status: "SUCCESS", removedCount });
+          if (removedCount > 0) {
+            // Same reasoning as the LOG_CART_EVENT broadcast above -- let
+            // any open dashboard tab know the ledger changed so it can
+            // reflect the removal without a manual reload.
+            chrome.runtime.sendMessage({ action: "SHOPPING_LEDGER_UPDATED" }).catch(() => {
+              // No dashboard tab currently open/listening -- fine, ignore.
+            });
+          }
+        })
+        .catch(err => sendResponse({ status: "ERROR", error: err.message }));
+    } else {
+      sendResponse({ status: "ERROR", error: "DB not initialized" });
+    }
+    return true;
+  }
 });
 
 // ---------------------------------------------------------------------------
