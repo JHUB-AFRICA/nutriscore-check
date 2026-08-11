@@ -9,12 +9,6 @@
 //     account yet, the user is told to use Sign Up instead.
 // Both always show Google's account picker (prompt: 'select_account') so
 // the user explicitly chooses which email to use each time.
-//
-// AUTH_SYNC: after a successful sign-in/sign-up (or sign-out), the current
-// user is also pushed to the NutriScore browser extension (if installed),
-// via chrome.runtime.sendMessage — see onMessageExternal in the extension's
-// background.js. This keeps the website and extension showing the same
-// signed-in account instead of two independent identities.
 
 import { initializeApp } from 'firebase/app';
 import {
@@ -44,73 +38,6 @@ const firebaseConfig = {
   appId: "1:923932588057:web:8575308e753659b6a85288",
   measurementId: "G-TFJ44W73CX"
 };
-
-// --- NutriScore extension identity sync ---
-// Replace with your extension's actual ID from chrome://extensions if it
-// changes (e.g. once published to the Chrome Web Store).
-const EXTENSION_ID = "cbdkgpcpbgadjfohhfccphbcblbkhmmk";
-
-/**
- * Pushes the current auth state to the extension so its popup shows the
- * same signed-in user as the website. Silently does nothing if the
- * extension isn't installed, isn't reachable, or chrome.runtime isn't
- * available (e.g. non-Chrome browsers) — this must never block sign-in.
- */
-function syncAccountToExtension(user) {
-  if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
-    return;
-  }
-  try {
-    const payload = user
-      ? { id: user.uid, email: user.email || '', picture: user.photoURL || '' }
-      : null;
-    chrome.runtime.sendMessage(EXTENSION_ID, { type: 'AUTH_SYNC', user: payload }, () => {
-      // Swallow "Could not establish connection" — expected when the
-      // extension isn't installed. chrome.runtime.lastError must still be
-      // read (even unused) or Chrome logs an unchecked error to console.
-      void chrome.runtime.lastError;
-    });
-  } catch (e) {
-    // Extension messaging can throw synchronously in some browsers/contexts;
-    // never let that break the website's own sign-in flow.
-    console.warn('Could not sync account to extension:', e);
-  }
-}
-
-/**
- * Pushes the saved health profile to the extension, same pattern as
- * syncAccountToExtension — so the popup's "View Health Details" button
- * can display it without the extension needing its own Firestore access.
- * Pass null to clear it (e.g. on sign-out).
- *
- * Also caches the same data in localStorage under 'nutriscoreHealthProfile'.
- * This is the more reliable path: the extension can read it directly from
- * the page (via chrome.scripting) whenever its popup opens, rather than
- * depending on this push message having fired and been received at the
- * exact right moment.
- */
-function syncHealthToExtension(health) {
-  try {
-    if (health) {
-      localStorage.setItem('nutriscoreHealthProfile', JSON.stringify(health));
-    } else {
-      localStorage.removeItem('nutriscoreHealthProfile');
-    }
-  } catch (e) {
-    console.warn('Failed to cache health profile in localStorage:', e);
-  }
-
-  if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
-    return;
-  }
-  try {
-    chrome.runtime.sendMessage(EXTENSION_ID, { type: 'HEALTH_SYNC', health }, () => {
-      void chrome.runtime.lastError;
-    });
-  } catch (e) {
-    console.warn('Could not sync health profile to extension:', e);
-  }
-}
 
 // Initialize Firebase app, Auth, and Firestore once for this page
 const app = initializeApp(firebaseConfig);
@@ -151,8 +78,7 @@ async function runGooglePopup() {
 
 /**
  * Finalizes a successful sign-in/sign-up: stores the user in memory and
- * localStorage, updates the UI, syncs identity to the extension, and loads
- * any saved health profile.
+ * localStorage, updates the UI, and loads any saved health profile.
  */
 async function completeSignIn(user) {
   currentUserId = user.uid;
@@ -171,7 +97,6 @@ async function completeSignIn(user) {
   }
 
   updateAccountUI(true);
-  syncAccountToExtension(user);
   await loadHealthPreferencesFromFirestore(currentUserId);
 }
 
@@ -190,8 +115,6 @@ async function silentlySignOut() {
   currentUser = null;
   try { localStorage.removeItem('nutriscoreUser'); } catch (e) {}
   updateAccountUI(false);
-  syncAccountToExtension(null);
-  syncHealthToExtension(null);
 }
 
 /**
@@ -250,8 +173,6 @@ function signOutUser() {
     try { localStorage.removeItem('nutriscoreUser'); } catch (e) {}
     applyStoredPreferences({ conditions: [], dietaryPreferences: [] });
     updateAccountUI(false);
-    syncAccountToExtension(null);
-    syncHealthToExtension(null);
     showStatus('Signed out.');
   });
 }
@@ -337,7 +258,6 @@ async function saveHealthPreferencesToFirestore() {
     // Path: users/{uid}/settings/health — one health doc per user
     await setDoc(doc(db, 'users', currentUserId, 'settings', 'health'), preferences);
     showStatus('Health profile saved to your account.');
-    syncHealthToExtension(preferences);
   } catch (error) {
     console.error('Failed to save health preferences to Firestore:', error);
     showStatus('Unable to save health profile. Please try again.', true);
@@ -353,7 +273,6 @@ async function loadHealthPreferencesFromFirestore(uid) {
     const snap = await getDoc(doc(db, 'users', uid, 'settings', 'health'));
     if (snap.exists()) {
       applyStoredPreferences(snap.data());
-      syncHealthToExtension(snap.data());
     }
   } catch (error) {
     console.error('Failed to load health preferences from Firestore:', error);
@@ -448,15 +367,6 @@ function init() {
   }
   if (signUpButton) {
     signUpButton.addEventListener('click', signUpWithGoogle);
-  }
-
-  // The extension popup can no longer sign in on its own (see background.js
-  // openSignInTab) — it opens this page with ?prompt=signin instead, so the
-  // website's own Firebase sign-in flow runs and pushes the result back to
-  // the extension via syncAccountToExtension()/AUTH_SYNC once it completes.
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('prompt') === 'signin') {
-    signInWithGoogle();
   }
   if (signOutButton) {
     signOutButton.addEventListener('click', signOutUser);

@@ -1,73 +1,104 @@
 /**
- * Naivas Retailer Adapter
+ * Carrefour Kenya Retailer Adapter
  * Implements IRetailerAdapter contract
+ * Primary ID: numeric product ID from anchor href "/p/<id>"
+ * Fallback:   name_hash
  */
 
-const NaivasAdapter = {
+const CarrefourAdapter = {
   getRetailerCode() {
-    return "NAIVAS";
+    return "CARREFOUR";
   },
 
-  // No confirmed selector yet for Naivas' actual cart page/list (the
-  // Carrefour equivalent, #entries-SLOTTED, was found via a live
-  // DevTools inspection -- Naivas hasn't had the same check done).
-  // Returns false for now, so cart-page logging simply doesn't fire
-  // here yet rather than risk logging things that aren't really in
-  // the cart. Same diagnostic approach as Carrefour would confirm the
-  // real container if/when needed.
+  // Confirmed real container id for the "My Cart" list -- also reused
+  // by detectProducts()/getObserveTarget() to scope badging away from
+  // the Best Sellers carousel. content.js uses this to decide whether
+  // a successful scan should be logged to shopping history.
   isCartPage() {
-    return false;
+    return !!document.getElementById("entries-SLOTTED");
   },
 
   getObserveTarget() {
-    return document.querySelector(".products.wrapper.grid.products-grid") || document.querySelector(".page-main") || document.body;
+    return document.getElementById("entries-SLOTTED")
+      || document.querySelector("[data-testid='product-grid']")
+      || document.querySelector(".css-19y7shm")?.parentElement
+      || document.body;
   },
 
   detectProducts() {
     const products = [];
-    const productSelector = "[class*='border-naivas-bg'], .product-item";
-    const nameSelector = "span.line-clamp-2, [class*='line-clamp'], .product-item-name a, a[href*='.html'], h3, h4";
-    const priceSelector = "span[class*='text-naivas-green'], .product-price, .price-box .price, .price";
-    const categorySelector = ".category-description, .items.breadcrumbs, .breadcrumb, .page-title-wrapper";
-    
-    // Category extraction
-    let categoryText = "";
-    document.querySelectorAll(categorySelector).forEach(el => {
-      categoryText += " " + (el?.textContent?.trim() || "");
-    });
-    const pageCategory = categoryText.toLowerCase();
 
-    const cards = document.querySelectorAll(productSelector);
+    // On the cart page, "My Cart" line items live inside a confirmed
+    // real container (id="entries-SLOTTED") -- scoping detection to
+    // just that excludes the "Best Sellers" upsell carousel and
+    // anything else on the page that also happens to contain product
+    // links. Falls back to a full-page search when that container
+    // isn't present (i.e. everywhere that isn't the cart page).
+    const cartList = document.getElementById("entries-SLOTTED");
+    const searchRoot = cartList || document;
 
-    cards.forEach((card) => {
+    // Most robust way: find ALL product links first. A product link is an anchor containing "/p/" or "/product/".
+    const productLinks = searchRoot.querySelectorAll("a[href*='/p/'], a[href*='/product/']");
+    const processedCards = new Set();
+
+    productLinks.forEach(anchor => {
+      // Find the closest container that likely represents the whole card
+      let card = anchor.closest("li") ||
+                 anchor.closest("[data-testid='product-card']") || 
+                 anchor.closest(".cl-product-card") || 
+                 anchor.closest("li[class*='product']") ||
+                 anchor.closest("div[class*='product-card']") ||
+                 anchor.closest("div[class*='ProductCard']") ||
+                 anchor.closest("div[class*='css-']");
+
+      if (!card) card = anchor.parentElement;
+      if (!card || processedCards.has(card)) return;
       if (card.hasAttribute("data-nutriscore-scanned") && !this.isCartPage()) return;
 
-      const nameEl = card.querySelector(nameSelector);
-      let name = nameEl?.textContent?.trim() || "";
-      if (!name && nameEl?.tagName?.toLowerCase() === 'a') {
-        name = nameEl?.getAttribute("title") || nameEl?.getAttribute("aria-label") || "";
+      processedCards.add(card);
+
+      // 1. Extract Product ID from the href
+      let retailerProductId = null;
+      const match = anchor.href.match(/\/(?:p|product)\/(\d+)/);
+      if (match) retailerProductId = match[1];
+      if (!retailerProductId) {
+        retailerProductId = card.getAttribute("data-product-id") || card.getAttribute("data-id") || null;
+      }
+
+      // 2. Extract Name
+      let name = "";
+      const nameEl = card.querySelector("[data-testid='product-title'], h2, h3, h4, [class*='title'], [class*='name']");
+      if (nameEl) name = nameEl.textContent?.trim() || "";
+      
+      if (!name) {
+        name = anchor.getAttribute("title") || anchor.getAttribute("aria-label") || "";
+      }
+      
+      if (!name) {
+         const text = anchor.textContent?.trim() || "";
+         if (text && !text.match(/^kes\s*[\d,.]+$/i)) {
+             name = text;
+         }
       }
 
       if (!name) return;
 
+      // 3. Extract Price
       let priceNumeric = 0;
-      const priceEl = card.querySelector(priceSelector);
+      const priceEl = card.querySelector("[data-testid='product-price'], [class*='price'], [class*='Price'], .css-10n2u0s, .css-1bndvqp");
       if (priceEl) {
-        let priceText = priceEl?.textContent?.trim() || "";
+        const priceText = priceEl.textContent?.trim() || "";
         priceNumeric = parseFloat(priceText.replace(/[^0-9.]/g, "")) || 0;
       }
 
-      const id = card.getAttribute("data-product-id") || card.getAttribute("data-sku") || null;
-      const hash = card.getAttribute("data-original-hash") || null;
-
       products.push({
-        domElement: card,
-        id: id,
-        name: name,
-        nameHash: hash,
-        price: priceNumeric,
-        scrapedCategory: pageCategory,
-        url: card.querySelector("a[href]")?.href || null
+        domElement:         card,
+        id:                 retailerProductId,
+        name:               name,
+        nameHash:           null,
+        price:              priceNumeric,
+        scrapedCategory:    "",
+        url:                anchor.href
       });
     });
 
@@ -98,6 +129,7 @@ const NaivasAdapter = {
     return bestNode;
   },
 
+  // ── Shared UI renderer (same design as NaivasAdapter) ──────────────────
   injectBadge(card, productResult, price) {
     // On the cart page a card can be re-verified on every mutation (see
     // content.js reconcileCart) even when it already has a badge -- clear
@@ -112,7 +144,7 @@ const NaivasAdapter = {
     }
 
     const badgeContainer = document.createElement("div");
-    badgeContainer.className = "nutriscore-isolated-root";
+    badgeContainer.className  = "nutriscore-isolated-root";
     badgeContainer.style.cssText = "position:absolute;top:8px;right:8px;z-index:1000;";
 
     const shadow = badgeContainer.attachShadow({ mode: "open" });
@@ -132,7 +164,7 @@ const NaivasAdapter = {
     const diseaseWarnings = productResult.diseaseWarnings || [];
     const disclaimer      = productResult.diseaseDisclaimer || "";
 
-    // Ingredient Quantities (per 100g/100ml) — NOVA removed
+    // ── Ingredient Quantities Panel ──────────────────────────────────
     const rawRows = [
       { label: "Energy",        val: prof.energy_kj,  unit: "kJ" },
       { label: "Fat",           val: prof.fat_g,      unit: "g" },
@@ -154,6 +186,7 @@ const NaivasAdapter = {
         <span class="ns-value">${r.value}</span>
       </div>`).join("");
 
+    // ── Disease Warning Pills ────────────────────────────────────────
     const diseaseHTML = diseaseWarnings.length ? `
       <div class="ns-disease-block">
         <div class="ns-disease-title">⚠ Dietary Flags</div>
@@ -165,6 +198,7 @@ const NaivasAdapter = {
         ${disclaimer ? `<div class="ns-disclaimer">${this.escapeHTML(disclaimer)}</div>` : ""}
       </div>` : "";
 
+    // ── Confidence indicator ─────────────────────────────────────────
     const conf = productResult.confidence || "";
     const confLabel = conf === "retailer_label" ? "📊 From label"
                     : conf === "category_default" ? "📋 Category est."
@@ -256,6 +290,7 @@ const NaivasAdapter = {
     const closeBtn = shadow.querySelector(".ns-close");
     if (closeBtn) closeBtn.addEventListener("click", () => flyout.classList.remove("open"));
 
+    // Force relative positioning without reading computed style to avoid Layout Thrashing
     card.setAttribute("data-nutriscore-id", productResult.productId || "");
     anchorEl.appendChild(badgeContainer);
     return shadow;
@@ -267,19 +302,19 @@ const NaivasAdapter = {
     const txt = (btn.textContent || "").toLowerCase();
     if (!txt.includes("add") && !txt.includes("cart") && !(btn.className || "").includes("tocart")) return null;
     
-    const card = btn.closest("[class*='border-naivas-bg'], .product-item");
+    const card = btn.closest("[data-testid='product-card'], .cl-product-card, li[class*='product'], div[class*='product-card'], div[class*='ProductCard']");
     if (!card) return null;
     if (card.getAttribute("data-nutriscore-scanned") !== "complete") return null;
     
     const productId = card.getAttribute("data-nutriscore-id");
     if (!productId) return null;
     
-    const priceEl = card.querySelector("span[class*='text-naivas-green'], .product-price, .price-box .price, .price");
+    const priceEl = card.querySelector("[data-testid='product-price'], [class*='price'], [class*='Price'], .css-10n2u0s, .css-1bndvqp");
     const price = priceEl ? parseFloat((priceEl.textContent || "").replace(/[^0-9.]/g, "")) : 0;
     
     return {
       productId,
-      retailer: "NAIVAS",
+      retailer: "CARREFOUR",
       priceSnapshot: price || null
     };
   },
@@ -290,4 +325,4 @@ const NaivasAdapter = {
   }
 };
 
-window.RetailerAdapter = NaivasAdapter;
+window.RetailerAdapter = CarrefourAdapter;

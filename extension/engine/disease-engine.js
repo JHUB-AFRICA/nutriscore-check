@@ -8,62 +8,66 @@ const DiseaseEngine = {
   // Disclaimer required by AI-003 to prevent medical advice framing
   DISCLAIMER: "This information is based on standard thresholds and is not medical advice. Consult a healthcare provider.",
 
-  evaluate(data) {
+  evaluate(data, settings = { diabetes: true, hypertension: true, cardiovascular: true }) {
     const warnings = [];
 
-    // DR-001 / DR-004: Diabetes (Focus on Sugars)
-    // Threshold: > 10g sugars per 100g
-    if (data.sugars > 10) {
+    // DR-001: DIABETES
+    if (settings.diabetes && data.sugars > 22.5) {
       warnings.push({
         disease: "Diabetes",
-        condition: "High Sugar Content",
-        triggerQuantity: `${data.sugars}g`,
-        msg: "Contains high sugar quantities which may spike blood glucose levels."
+        condition: "High sugar linked to glucose spikes",
+        triggerQuantity: `>${22.5}g`,
       });
     }
 
-    // DR-002 / DR-005: Hypertension / CVD (Focus on Sodium & Saturated Fat)
-    // Threshold: > 400mg sodium or > 5g saturated fat per 100g
-    if (data.sodium > 400) {
+    // DR-002: HYPERTENSION
+    if (settings.hypertension && data.sodium > 600) {
       warnings.push({
-        disease: "Hypertension / CVD",
-        condition: "High Sodium Content",
-        triggerQuantity: `${data.sodium}mg`,
-        msg: "High sodium quantities are linked to elevated blood pressure."
+        disease: "Hypertension",
+        condition: "High sodium linked to high BP",
+        triggerQuantity: `>${600}mg`,
       });
     }
 
-    if (data.sat_fat > 5) {
+    // DR-003: CVD (Cardiovascular Disease)
+    if (settings.cardiovascular && data.sat_fat > 5) {
       warnings.push({
-        disease: "Cardiovascular Disease",
-        condition: "High Saturated Fat",
-        triggerQuantity: `${data.sat_fat}g`,
-        msg: "High saturated fat quantities can increase LDL cholesterol."
+        disease: "Heart Disease (CVD)",
+        condition: "High sat fat increases LDL",
+        triggerQuantity: `>${5}g`,
       });
     }
 
-    // DR-003 / DR-006: Kidney Disease (Focus on Protein, Sodium, Potassium)
-    // Threshold: > 15g protein or > 300mg potassium or > 400mg sodium per 100g
-    if (data.protein > 15) {
+    // DR-004: CVD (Cardiovascular Disease)
+    if (settings.cardiovascular && data.sodium > 400 && data.sodium <= 600) {
+      warnings.push({
+        disease: "Heart Disease (CVD)",
+        condition: "Moderate-high sodium impacts heart",
+        triggerQuantity: `>${400}mg`,
+      });
+    }
+
+    // DR-005: KIDNEY — Potassium > 200 mg/100g
+    if (settings.kidney && data.potassium > 200) {
       warnings.push({
         disease: "Kidney Disease",
-        condition: "High Protein Content",
-        triggerQuantity: `${data.protein}g`,
-        msg: "High protein quantities can strain compromised kidneys."
+        condition: "High potassium needs monitoring",
+        triggerQuantity: `>${200}mg`,
       });
     }
-    if (data.potassium > 300) {
+
+    // DR-006: KIDNEY — Sodium > 600 mg/100g
+    if (settings.kidney && data.sodium > 600) {
       warnings.push({
         disease: "Kidney Disease",
-        condition: "High Potassium Content",
-        triggerQuantity: `${data.potassium}mg`,
-        msg: "High potassium quantities must be monitored in kidney disease."
+        condition: "High sodium strains compromised kidneys",
+        triggerQuantity: `>${600}mg`,
       });
     }
 
     return {
       warnings: warnings,
-      disclaimer: this.DISCLAIMER
+      disclaimer: warnings.length > 0 ? this.DISCLAIMER : ""
     };
   }
 };
