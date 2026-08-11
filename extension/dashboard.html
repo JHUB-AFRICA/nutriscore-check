@@ -1,299 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NutriScore - Personal Health & Trends Dashboard</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      background-color: #f1f5f9;
-      color: #0f172a;
-    }
-    .nav {
-      background-color: #ffffff;
-      border-bottom: 1px solid #e2e8f0;
-      padding: 16px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .logo-mark {
-      background: #059669;
-      color: white;
-      width: 32px;
-      height: 32px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 6px;
-      font-weight: 900;
-      font-size: 18px;
-    }
-    .brand-title {
-      font-weight: 850;
-      font-size: 18px;
-      color: #0f172a;
-      letter-spacing: -0.5px;
-    }
-    .container {
-      max-width: 1100px;
-      margin: 32px auto;
-      padding: 0 24px;
-    }
-    .dash-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 20px;
-      margin-bottom: 30px;
-    }
-    .stat-card {
-      background: white;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 20px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    .stat-label {
-      font-size: 11px;
-      font-weight: 700;
-      color: #64748b;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 6px;
-    }
-    .stat-val-huge {
-      font-size: 32px;
-      font-weight: 850;
-      color: #0f172a;
-    }
-    .stat-sub {
-      font-size: 11px;
-      margin-top: 6px;
-      color: #059669;
-      font-weight: 600;
-    }
-    .layout-split {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 24px;
-    }
-    .main-panel, .side-panel {
-      background: white;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 24px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-      margin-bottom: 24px;
-    }
-    .panel-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-      border-bottom: 1px solid #f1f5f9;
-      padding-bottom: 12px;
-    }
-    .panel-title {
-      font-size: 16px;
-      font-weight: 800;
-      color: #0f172a;
-    }
-    .chart-container {
-      height: 250px;
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #f8fafc;
-      border-radius: 8px;
-      border: 1px dashed #cbd5e1;
-      padding: 16px;
-    }
-    .log-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-    .log-table th {
-      text-align: left;
-      padding: 12px 10px;
-      border-bottom: 2px solid #e2e8f0;
-      color: #475569;
-      font-weight: 700;
-    }
-    .log-table td {
-      padding: 12px 10px;
-      border-bottom: 1px solid #f1f5f9;
-      color: #334155;
-    }
-    .log-table tr:hover {
-      background-color: #f8fafc;
-    }
-    .mini-badge {
-      display: inline-block;
-      padding: 2px 6px;
-      font-weight: 850;
-      font-size: 11px;
-      border-radius: 4px;
-      color: white;
-      text-align: center;
-    }
-    .bg-A { background-color: #008246; }
-    .bg-B { background-color: #3cb371; }
-    .bg-C { background-color: #ffcc00; color: #111111; }
-    .bg-D { background-color: #ff6600; }
-    .bg-E { background-color: #e63b2e; }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NutriScore Dashboard</title>
+    <style>
+      html, body { margin: 0; padding: 0; height: 100vh; }
 
-    .grade-bar {
-      display: flex;
-      height: 20px;
-      border-radius: 4px;
-      overflow: hidden;
-      margin-top: 10px;
-    }
-    .grade-bar-segment {
-      height: 100%;
-      color: white;
-      font-size: 10px;
-      font-weight: bold;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: width 0.3s ease;
-    }
-    .btn-secondary {
-      background: #fff;
-      border: 1px solid #cbd5e1;
-      color: #334155;
-      padding: 8px 16px;
-      border-radius: 6px;
-      font-weight: 600;
-      font-size: 12px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .btn-secondary:hover {
-      background: #f8fafc;
-      border-color: #94a3b8;
-    }
-    .no-data {
-      text-align: center;
-      color: #94a3b8;
-      padding: 48px 0;
-    }
-  </style>
-</head>
-<body>
-  <div class="nav">
-    <div class="brand">
-      <div class="logo-mark">N</div>
-      <div class="brand-title">NutriScore Checkout Tool</div>
-    </div>
-    <div>
-      <button id="reset-data-btn" class="btn-secondary">⚠️ Reset All Historical Log</button>
-    </div>
-  </div>
+      /* Manual fallback for the auto-reload listener below, in case a
+         message ever gets missed (tab was backgrounded, etc). Sits
+         outside the React root so it works no matter what's rendered. */
+      #ns-reload-btn {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        z-index: 99999;
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        border: 1.5px solid rgba(15, 23, 42, 0.08);
+        background: #fff;
+        color: #617083;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+        transition: border-color 0.15s ease, color 0.15s ease;
+      }
+      #ns-reload-btn:hover {
+        border-color: #16a34a;
+        color: #16a34a;
+      }
+      #ns-reload-btn svg {
+        width: 16px;
+        height: 16px;
+      }
+      #ns-reload-btn.spinning svg {
+        animation: ns-dash-spin 0.7s linear infinite;
+      }
+      @keyframes ns-dash-spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+    </style>
+    <script type="module" crossorigin src="/assets/dashboard-BD5L4IdJ.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/index-BAt1XuiS.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-HTjAKQ8_.css">
+  </head>
+  <body>
+    <div id="root"></div>
 
-  <div class="container">
-    <div class="dash-grid">
-      <div class="stat-card">
-        <div class="stat-label">Total Grocery Scans</div>
-        <div id="metric-scans" class="stat-val-huge">0</div>
-        <div class="stat-sub">From local browser session</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Average Basket Score</div>
-        <div id="metric-avg-score" class="stat-val-huge">--</div>
-        <div id="metric-avg-label" class="stat-sub">Calculating...</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Nutritional Swaps</div>
-        <div id="metric-swaps" class="stat-val-huge">0</div>
-        <div class="stat-sub">Alternative products clicked</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Shopping Health Score</div>
-        <div id="metric-health-grade" class="stat-val-huge">--</div>
-        <div class="stat-sub">Current grocery grade</div>
-      </div>
-    </div>
+    <button id="ns-reload-btn" type="button" title="Reload dashboard data" aria-label="Reload dashboard data">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+    </button>
 
-    <div class="layout-split">
-      <div>
-        <div class="main-panel">
-          <div class="panel-header">
-            <div class="panel-title">Longitudinal Nutritional Score Trend</div>
-          </div>
-          <div class="chart-container" id="trend-chart-container">
-            <svg id="trend-svg" width="100%" height="100%" style="overflow: visible;"></svg>
-          </div>
-        </div>
-
-        <div class="main-panel">
-          <div class="panel-header">
-            <div class="panel-title">Audited Item Scans Log</div>
-          </div>
-          <div style="overflow-x: auto;">
-            <table class="log-table">
-              <thead>
-                <tr>
-                  <th>Product Name</th>
-                  <th>Retailer</th>
-                  <th>Nutri-Score</th>
-                  <th>Grade</th>
-                  <th>Saturated Fat</th>
-                  <th>Sugars</th>
-                  <th>Sodium</th>
-                </tr>
-              </thead>
-              <tbody id="scans-log-body">
-                <tr>
-                  <td colspan="7" class="no-data">No product scans found in IndexedDB history.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <div class="side-panel">
-          <div class="panel-header">
-            <div class="panel-title">Scanned Grade Distribution</div>
-          </div>
-          <p style="font-size: 11px; color: #64748b; margin-top: -10px; margin-bottom: 16px;">
-            Target a healthier margin of Grade A and B products!
-          </p>
-          <div id="grade-breakdown-numbers" style="display: flex; flex-direction: column; gap: 8px;">
-            <!-- Render distribution bars -->
-          </div>
-          <div class="grade-bar" id="grade-visual-bar">
-            <!-- Populated via script -->
-          </div>
-        </div>
-
-        <div class="side-panel">
-          <div class="panel-header">
-            <div class="panel-title">Tips for East African Groceries</div>
-          </div>
-          <div style="font-size: 12px; color: #334155; line-height: 1.6;">
-            <p><strong>1. Watch Flour Options:</strong> Wholemeal Maize meal (like un-refined Unga) secures direct Grade A due to high fiber, whereas highly-refined premium meal lands at Grade B/C.</p>
-            <p><strong>2. Kenyan Teas are naturally Grade A:</strong> Plain tea leaves like Ketepa contain no added sodium, calories or sugar. Drink without sweeteners to retain their benefits.</p>
-            <p><strong>3. Low-Fat Dairy swaps:</strong> Swapping whole-fat milk packets to Brookside slim or skimmed milk directly decreases saturated fats, elevating your grade from Grade C to Grade B.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script src="dashboard.js"></script>
-</body>
+  </body>
 </html>

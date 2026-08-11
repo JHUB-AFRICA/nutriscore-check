@@ -8,11 +8,10 @@ const ScoreEngine = {
   score(data, fsaCategoryCode) {
     if (data.is_raw_food) {
       return {
-        score: -15,
-        grade: "A",
-        fsaCategory: fsaCategoryCode,
-        nova: 1,
-        algorithmVersion: "FSA-NPS-2023",
+        LetterGrade: "A",
+        NumericScore: -15,
+        FSACategoryUsed: fsaCategoryCode,
+        AlgorithmVersion: "FSA-NPS-2023",
         breakdown: { N_Points: 0, P_Points: 15, msg: "Raw/Fresh Bypass" }
       };
     }
@@ -20,29 +19,34 @@ const ScoreEngine = {
     const { energy, sugars, sat_fat, sodium, fiber, protein, fruits_veg_pct } = data;
 
     // N-Points (Negative Points)
+    // 2023 Base Max: Energy (10), Sugars (15), SatFat (10), Sodium (20)
     let nEnergy = Math.min(Math.floor(energy / 335), 10);
-    let nSugars = Math.min(Math.floor(sugars / 4.5), 10);
+    // Sugar Ib scale: max 15 points, ~3.4g per point
+    let nSugars = Math.min(Math.floor(sugars / 3.4), 15);
     let nSatFat = Math.min(Math.floor(sat_fat / 1), 10);
-    let nSodium = Math.min(Math.floor(sodium / 90), 10);
+    // Salt: max 20 points, ~80mg sodium (0.2g salt) per point
+    let nSodium = Math.min(Math.floor(sodium / 80), 20);
 
     // Adjusted for 2023 FSA-NPS BEVERAGE path
     if (fsaCategoryCode === "BEVERAGE") {
       nEnergy = energy <= 0 ? 0 : Math.min(Math.floor(energy / 30) + 1, 10);
-      nSugars = sugars <= 0 ? 0 : Math.min(Math.floor(sugars / 1.5) + 1, 10);
+      nSugars = sugars <= 0 ? 0 : Math.min(Math.floor(sugars / 1.5) + 1, 15);
     }
 
     // Adjusted for 2023 FSA-NPS ADDED_FAT path (Ratio of sat fat to total fat)
     if (fsaCategoryCode === "ADDED_FAT") {
       const totalFat = data.total_fat || (sat_fat * 1.5); // Fallback assumption
-      const fatRatio = (sat_fat / totalFat) * 100;
+      const fatRatio = totalFat > 0 ? (sat_fat / totalFat) * 100 : 0;
       nSatFat = Math.min(Math.floor(fatRatio / 10), 10);
     }
 
     const nPoints = nEnergy + nSugars + nSatFat + nSodium;
 
     // P-Points (Positive Points)
+    // Fibre: max 5
     let pFiber = Math.min(Math.floor(fiber / 0.9), 5);
-    let pProtein = Math.min(Math.floor(protein / 1.6), 5);
+    // Protein: max 7 points (2023 scale)
+    let pProtein = Math.min(Math.floor(protein / 2.4), 7);
 
     // RED_MEAT penalty (2023 constraint - max protein score is capped to prevent artificially elevating red meat scores)
     if (fsaCategoryCode === "RED_MEAT") {
@@ -69,7 +73,7 @@ const ScoreEngine = {
     // Grade assignment
     let grade = 'C';
     if (fsaCategoryCode === "BEVERAGE") {
-      if (data.name.toLowerCase() === 'water') grade = 'A';
+      if (data.name && data.name.toLowerCase() === 'water') grade = 'A';
       else if (finalScore <= 1) grade = 'B';
       else if (finalScore <= 5) grade = 'C';
       else if (finalScore <= 9) grade = 'D';
@@ -83,11 +87,10 @@ const ScoreEngine = {
     }
 
     return {
-      score: finalScore,
-      grade: grade,
-      fsaCategory: fsaCategoryCode,
-      nova: data.nova_group || 3, // Simplification
-      algorithmVersion: "FSA-NPS-2023",
+      LetterGrade: grade,
+      NumericScore: finalScore,
+      FSACategoryUsed: fsaCategoryCode,
+      AlgorithmVersion: "FSA-NPS-2023",
       breakdown: { N_Points: nPoints, P_Points: pPoints }
     };
   }

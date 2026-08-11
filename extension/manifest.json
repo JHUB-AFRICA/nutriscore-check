@@ -1,29 +1,53 @@
 {
   "manifest_version": 3,
   "name": "NutriScore Checkout Tool (Kenya)",
-  "version": "1.0.0",
-  "description": "Scrapes and evaluates product ingredients, calculating official Nutri-Scores with healthier alternatives directly inside Kenyan online grocery stores.",
+  "version": "1.1.0",
+  "description": "Real-time NutriScore grades with disease-specific dietary flags for Naivas and Carrefour Kenya.",
   "permissions": [
     "storage",
     "activeTab",
-    "scripting"
+    "scripting",
+    "identity"
   ],
   "host_permissions": [
     "*://*.naivas.online/*",
     "*://*.naivas.co.ke/*",
-    "https://world.openfoodfacts.org/*"
+    "*://*.carrefour.ke/*",
+    "*://*.carrefourkenya.com/*",
+    "https://nutriscore-check.vercel.app/*",
+    "https://identitytoolkit.googleapis.com/*",
+    "https://securetoken.googleapis.com/*",
+    "https://firestore.googleapis.com/*"
   ],
+  "oauth2": {
+    "client_id": "923932588057-vrp3kj4qlg0lvsak0gg0is2ndc8p4pbt.apps.googleusercontent.com",
+    "scopes": ["openid", "email", "profile"]
+  },
+  "externally_connectable": {
+    "matches": ["https://nutriscore-check.vercel.app/*"]
+  },
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
       "matches": [
-        "<all_urls>"
+        "*://*.naivas.online/*",
+        "*://*.naivas.co.ke/*"
       ],
       "js": [
         "adapters/naivas.js",
-        "adapters/generic.js",
+        "content.js"
+      ],
+      "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "*://*.carrefour.ke/*",
+        "*://*.carrefourkenya.com/*"
+      ],
+      "js": [
+        "adapters/carrefour.js",
         "content.js"
       ],
       "run_at": "document_end"
@@ -44,9 +68,7 @@
         "dashboard.html",
         "db.js"
       ],
-      "matches": [
-        "<all_urls>"
-      ]
+      "matches": ["<all_urls>"]
     }
   ]
 }

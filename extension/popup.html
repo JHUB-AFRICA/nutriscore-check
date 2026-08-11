@@ -1,179 +1,392 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NutriScore Checkout Tool</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      width: 320px;
-      color: #1e293b;
-      background-color: #f8fafc;
-    }
-    .header {
-      background: linear-gradient(135deg, #059669 0%, #10b981 100%);
-      color: white;
-      padding: 16px;
-      text-align: center;
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-    }
-    .header h1 {
-      margin: 0;
-      font-size: 16px;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-    }
-    .header p {
-      margin: 4px 0 0 0;
-      font-size: 11px;
-      opacity: 0.9;
-    }
-    .content {
-      padding: 16px;
-    }
-    .stats-card {
-      background: white;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 14px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    .stat-val {
-      font-size: 24px;
-      font-weight: 800;
-      color: #047857;
-    }
-    .stat-lbl {
-      font-size: 11px;
-      text-transform: uppercase;
-      font-weight: 700;
-      color: #64748b;
-      letter-spacing: 0.5px;
-    }
-    .grade-badge {
-      display: inline-block;
-      width: 38px;
-      height: 38px;
-      line-height: 38px;
-      text-align: center;
-      border-radius: 50%;
-      font-weight: 900;
-      font-size: 20px;
-      color: white;
-    }
-    .badge-A { background-color: #008246; }
-    .badge-B { background-color: #3cb371; }
-    .badge-C { background-color: #ffcc00; color: #111111; }
-    .badge-D { background-color: #ff6600; }
-    .badge-E { background-color: #e63b2e; }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NutriScore Popup</title>
+    <style>
+      :root {
+        --accent: #16a34a;
+        --accent-dark: #15803d;
+        --accent-soft: #ecfdf5;
+        --text: #0f172a;
+        --muted: #617083;
+        --border: rgba(15, 23, 42, 0.08);
+        --shadow: 0 8px 30px rgba(22, 163, 74, 0.08);
+      }
 
-    .items-title {
-      font-size: 12px;
-      font-weight: 700;
-      color: #475569;
-      margin-bottom: 8px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .scanned-list {
-      max-height: 180px;
-      overflow-y: auto;
-      margin: 0;
-      padding: 0;
-      list-style-type: none;
-    }
-    .scanned-item {
-      background: #ffffff;
-      border: 1px solid #f1f5f9;
-      border-radius: 6px;
-      padding: 8px 10px;
-      margin-bottom: 6px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 12px;
-    }
-    .item-name {
-      font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 190px;
-      color: #0f172a;
-    }
-    .item-retailer {
-      font-size: 10px;
-      color: #94a3b8;
-    }
-    .item-grade {
-      width: 20px;
-      height: 20px;
-      line-height: 20px;
-      text-align: center;
-      border-radius: 4px;
-      color: white;
-      font-weight: bold;
-      font-size: 11px;
-    }
-    .btn-action {
-      background-color: #0f172a;
-      color: white;
-      border: none;
-      width: 100%;
-      padding: 10px;
-      border-radius: 6px;
-      font-weight: 700;
-      font-size: 12px;
-      cursor: pointer;
-      text-align: center;
-      display: block;
-      box-shadow: 0 4px 6px -1px rgba(15,23,42,0.2);
-      transition: background 0.15s;
-      text-decoration: none;
-      margin-top: 10px;
-    }
-    .btn-action:hover {
-      background-color: #1e293b;
-    }
-    .empty-state {
-      text-align: center;
-      color: #94a3b8;
-      font-size: 12px;
-      padding: 24px 0;
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>NutriScore Checkout Tool</h1>
-    <p>Guiding Healthy Swaps in Kenyan Groceries</p>
-  </div>
-  <div class="content">
-    <div class="stats-card">
-      <div>
-        <div class="stat-lbl">Basket Health</div>
-        <div class="stat-val" id="avg-score">--</div>
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: fit-content;
+        height: fit-content;
+        overflow: hidden;
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--text);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      .popup {
+        width: max-content;
+        min-width: 300px;
+        max-width: 380px;
+        border-radius: 20px;
+        overflow: hidden;
+        background: linear-gradient(180deg, rgba(236, 253, 245, 0.6), #ffffff 60px);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+      }
+
+      .popup-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 16px 18px 12px;
+      }
+
+      .popup-header-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .health-badge {
+        display: grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        border: 1.5px solid var(--border);
+        background: #fff;
+        color: var(--muted);
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+      }
+
+      .health-badge:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .health-badge.has-data {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .health-badge .icon {
+        width: 16px;
+        height: 16px;
+      }
+
+      .logo-mark {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(135deg, var(--accent), #34d399);
+        color: #fff;
+        font-weight: 800;
+        box-shadow: 0 8px 18px rgba(22, 163, 74, 0.22);
+      }
+
+      .popup-title {
+        margin: 0;
+        font-weight: 800;
+        font-size: 1rem;
+        letter-spacing: -0.01em;
+      }
+
+      .popup-subtitle {
+        margin: 0;
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+
+      .status-row {
+        padding: 0 18px;
+      }
+
+      .status-pill {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        border: 1px solid var(--border);
+        padding: 8px 14px;
+      }
+
+      .status-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background-color: var(--muted);
+        flex-shrink: 0;
+      }
+
+      .status-dot.active {
+        background-color: var(--accent);
+        animation: ns-pulse 1.6s ease-in-out infinite;
+      }
+
+      @keyframes ns-pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.4); }
+        50% { box-shadow: 0 0 0 5px rgba(22, 163, 74, 0); }
+      }
+
+      #refreshBtn.spinning svg {
+        animation: ns-spin 0.7s linear infinite;
+      }
+
+      @keyframes ns-spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+
+      .status-text {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .score-row {
+        padding: 12px 18px 0;
+      }
+
+      .score-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        padding: 12px 16px;
+        background: #fff;
+      }
+
+      .score-label {
+        font-size: 0.82rem;
+        color: var(--muted);
+        font-weight: 600;
+      }
+
+      .score-count {
+        display: inline-grid;
+        place-items: center;
+        min-width: 34px;
+        height: 34px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 800;
+        font-size: 0.95rem;
+      }
+
+      .account-row {
+        padding: 14px 18px 0;
+      }
+
+      .account-signed-in {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        padding: 10px 12px;
+        background: #fff;
+      }
+
+      .account-user {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .avatar {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        object-fit: cover;
+      }
+
+      .avatar-fallback {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--accent-soft);
+        color: var(--accent);
+        display: grid;
+        place-items: center;
+        font-size: 0.7rem;
+        font-weight: 800;
+        flex-shrink: 0;
+      }
+
+      .account-email {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .btn {
+        cursor: pointer;
+        font-family: inherit;
+      }
+
+      .btn-signout {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1.5px solid var(--border);
+        background: transparent;
+        color: var(--muted);
+        font-weight: 700;
+        font-size: 0.72rem;
+        flex-shrink: 0;
+      }
+
+      .btn-signout:hover {
+        background: rgba(15, 23, 42, 0.04);
+      }
+
+      .btn-signin {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 16px;
+        border-radius: 999px;
+        border: 1.5px solid var(--accent);
+        background: transparent;
+        color: var(--accent);
+        font-weight: 700;
+        font-size: 0.85rem;
+        transition: background-color 0.2s ease, transform 0.2s ease;
+      }
+
+      .btn-signin:hover {
+        background: var(--accent-soft);
+      }
+
+      .cta-row {
+        padding: 14px 18px 18px;
+      }
+
+      .btn-cta {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 18px;
+        border-radius: 999px;
+        border: none;
+        background: linear-gradient(135deg, var(--accent), #34d399);
+        color: #fff;
+        font-weight: 700;
+        font-size: 0.88rem;
+        box-shadow: 0 8px 18px rgba(22, 163, 74, 0.22);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .btn-cta:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 22px rgba(22, 163, 74, 0.28);
+      }
+
+      .icon {
+        width: 15px;
+        height: 15px;
+        flex-shrink: 0;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="popup">
+      <div class="popup-header">
+        <div class="popup-header-left">
+          <div class="logo-mark">N</div>
+          <div>
+            <p class="popup-title">NutriScore</p>
+            <p class="popup-subtitle">Checkout Tool · NUT-04</p>
+          </div>
+        </div>
+        <button id="refreshBtn" type="button" class="health-badge" title="Refresh saved data" aria-label="Refresh saved data">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+        </button>
+        <button id="healthDetailsBtn" type="button" class="health-badge" title="View health details" aria-label="View health details">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>
+        </button>
       </div>
-      <div>
-        <div id="avg-grade" class="grade-badge badge-C">C</div>
+
+      <div class="status-row">
+        <div class="status-pill">
+          <span id="statusDot" class="status-dot"></span>
+          <span id="statusText" class="status-text">Not a supported store</span>
+        </div>
+      </div>
+
+      <div class="score-row">
+        <div class="score-card">
+          <span class="score-label">Items scored on this page</span>
+          <span id="scoreCount" class="score-count">0</span>
+        </div>
+      </div>
+
+      <div class="account-row">
+        <!-- Signed out state -->
+        <button id="signInBtn" type="button" class="btn btn-signin">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          Sign in with Google
+        </button>
+
+        <!-- Signed in state -->
+        <div id="accountSignedIn" class="account-signed-in" hidden>
+          <div class="account-user">
+            <img id="avatarImg" class="avatar" hidden alt="" />
+            <div id="avatarFallback" class="avatar-fallback" hidden>?</div>
+            <span id="accountEmail" class="account-email"></span>
+          </div>
+          <button id="signOutBtn" type="button" class="btn btn-signout">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Sign out
+          </button>
+        </div>
+      </div>
+
+      <!-- Health details panel: toggled by the badge icon in the header -->
+      <div class="health-row" style="padding: 12px 18px 0;">
+        <div id="healthDetailsPanel" style="display:none; border-radius:16px; border:1px solid var(--border); background:#fff; padding:12px 14px; font-size:0.8rem; color:var(--text);"></div>
+      </div>
+
+      <div class="cta-row">
+        <button id="dashboardBtn" type="button" class="btn btn-cta">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+          View Shopping Analytics
+        </button>
       </div>
     </div>
 
-    <div class="items-title" id="items-header">Scanned Products (0)</div>
-    <ul class="scanned-list" id="scanned-list">
-      <div class="empty-state">No product scans in this session.<br>Visit Carrefour, Naivas, or Jumia to start.</div>
-    </ul>
-
-    <a href="#" id="open-dashboard" class="btn-action">📊 Open Trends Dashboard</a>
-    <button id="clear-scans-btn" style="background: none; border: none; color: #94a3b8; font-size: 10px; text-decoration: underline; margin-top: 12px; cursor: pointer; width: 100%; text-align: center;">Reset Scan Log</button>
-  </div>
-  <script src="popup.js"></script>
-</body>
+    <script src="assets/popup-XPSiyshT.js"></script>
+  </body>
 </html>
