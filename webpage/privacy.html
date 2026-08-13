@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NutriScore — Privacy Policy</title>
+  <link rel="stylesheet" href="site.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+</head>
+<body>
+
+  <nav class="site-nav">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo">
+        <span class="logo-mark">N</span>
+        <span class="logo-text">NutriScore <span class="logo-badge">Extension</span></span>
+      </a>
+      <div class="nav-links">
+        <button type="button" id="navSignButton" class="nav-action" onclick="location.href='health.html'">Sign in</button>
+      </div>
+    </div>
+  </nav>
+
+  <header class="site-header">
+    <p class="header-label">Legal</p>
+    <h1>Privacy Policy</h1>
+    <p class="header-subtitle">What the NutriScore Checkout Tool extension and website collect, why, and how you can remove it. Last updated August 12, 2026.</p>
+  </header>
+
+  <div class="page-wrapper">
+    <aside class="sidebar">
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <h4>On this page</h4>
+          <ul>
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#what-we-collect">What we collect</a></li>
+            <li><a href="#where-stored">Where it's stored</a></li>
+            <li><a href="#how-used">How it's used</a></li>
+            <li><a href="#sharing">Sharing &amp; third parties</a></li>
+            <li><a href="#control">Your controls</a></li>
+            <li><a href="#permissions">Extension permissions</a></li>
+            <li><a href="#contact">Contact</a></li>
+          </ul>
+        </div>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+
+      <section id="overview">
+        <h2>Overview</h2>
+        <p>NutriScore is a Chrome extension and companion website that show real-time nutrition grades and disease-specific dietary flags while you shop at Naivas and Carrefour Kenya. This page explains what data the extension and website handle, where it lives, and how you can delete it.</p>
+        <p>The short version: your health profile and shopping activity are used only to grade products and flag items for you. We don't sell data, and we don't run ads or trackers inside the extension itself.</p>
+      </section>
+
+      <section id="what-we-collect">
+        <h2>What we collect</h2>
+        <div class="features-grid">
+          <div class="feature-card">
+            <i class="ti ti-user"></i>
+            <h3>Account info</h3>
+            <p>If you sign in with Google, we receive your name, email address, and profile photo via Google OAuth.</p>
+          </div>
+          <div class="feature-card">
+            <i class="ti ti-heart-rate-monitor"></i>
+            <h3>Health profile</h3>
+            <p>Age, gender, allergies, medical conditions (e.g. diabetes, hypertension, cardiovascular, kidney), and dietary preferences you choose to enter, used to personalize warnings.</p>
+          </div>
+          <div class="feature-card">
+            <i class="ti ti-shopping-cart"></i>
+            <h3>Shopping activity</h3>
+            <p>Products you view or add to cart on supported retailer sites, and the grades assigned to them, kept as a local shopping ledger on your device.</p>
+          </div>
+          <div class="feature-card">
+            <i class="ti ti-adjustments"></i>
+            <h3>Preferences</h3>
+            <p>Which condition-based warnings you have toggled on or off (e.g. diabetes, hypertension alerts).</p>
+          </div>
+        </div>
+        <p>We do not collect payment details, government IDs, or precise location. We don't use analytics or advertising trackers inside the extension.</p>
+      </section>
+
+      <section id="where-stored">
+        <h2>Where it's stored</h2>
+        <p>Storage depends on which data it is:</p>
+        <ul class="plan-feature-list">
+          <li><i class="ti ti-check"></i> <strong>Shopping ledger and condition-warning toggles</strong> — stored only in your browser's local IndexedDB, on your device. This never leaves your browser unless you export it yourself.</li>
+          <li><i class="ti ti-check"></i> <strong>Health profile (age, gender, allergies, conditions, dietary preferences)</strong> — saved to a Google Firestore database tied to your signed-in account, so it can inform grading inside the extension.</li>
+          <li><i class="ti ti-check"></i> <strong>Sign-in session</strong> — an authentication token is kept in your browser's extension storage so you stay signed in.</li>
+        </ul>
+      </section>
+
+      <section id="how-used">
+        <h2>How it's used</h2>
+        <p>Your health profile and shopping data are used exclusively to:</p>
+        <ul class="plan-feature-list">
+          <li><i class="ti ti-check"></i> Calculate a NutriScore grade (A–E) for products you view</li>
+          <li><i class="ti ti-check"></i> Flag items that may conflict with a condition you've told us about (e.g. high sodium for hypertension)</li>
+          <li><i class="ti ti-check"></i> Show your own shopping history and grade trends back to you in the dashboard</li>
+        </ul>
+        <p>We do not use your data to train models, build advertising profiles, or make automated health decisions on your behalf — flags are informational, not medical advice.</p>
+      </section>
+
+      <section id="sharing">
+        <h2>Sharing &amp; third parties</h2>
+        <p>We do not sell or rent your data. Limited technical processors are involved only to run the service:</p>
+        <ul class="plan-feature-list">
+          <li><i class="ti ti-check"></i> <strong>Google Identity / Firebase</strong> — handles sign-in and stores your health profile</li>
+          <li><i class="ti ti-check"></i> <strong>Vercel</strong> — hosts the companion website</li>
+        </ul>
+        <p>None of these processors are permitted to use your data for their own purposes. We don't share data with the retailers (Naivas, Carrefour) themselves.</p>
+      </section>
+
+      <section id="control">
+        <h2>Your controls</h2>
+        <ul class="plan-feature-list">
+          <li><i class="ti ti-check"></i> <strong>Delete local data</strong> — the extension's dashboard has a "Delete all my data" button that permanently clears your shopping ledger and cached data from your device.</li>
+          <li><i class="ti ti-check"></i> <strong>Delete your health profile</strong> — sign in on the website and update or clear the fields in your health profile at any time.</li>
+          <li><i class="ti ti-check"></i> <strong>Sign out</strong> — signing out removes your local session token; your Firestore-stored profile remains until you delete it or request account deletion.</li>
+          <li><i class="ti ti-check"></i> <strong>Full account deletion</strong> — contact us (below) to have your Firestore data permanently removed.</li>
+          <li><i class="ti ti-check"></i> <strong>Uninstall</strong> — removing the extension deletes all locally stored data (IndexedDB, extension storage) immediately.</li>
+        </ul>
+      </section>
+
+      <section id="permissions">
+        <h2>Extension permissions, explained</h2>
+        <ul class="plan-feature-list">
+          <li><i class="ti ti-check"></i> <strong>storage</strong> — save your local shopping ledger and preferences</li>
+          <li><i class="ti ti-check"></i> <strong>activeTab / scripting</strong> — read product info on the current Naivas/Carrefour tab to compute a grade</li>
+          <li><i class="ti ti-check"></i> <strong>identity</strong> — support Google sign-in</li>
+          <li><i class="ti ti-check"></i> <strong>host permissions (naivas.online, naivas.co.ke, carrefour.ke, carrefourkenya.com)</strong> — needed to detect products and display grade badges on those specific retailer sites only</li>
+          <li><i class="ti ti-check"></i> <strong>host permissions (Google identity/Firestore endpoints, nutriscore-check.vercel.app)</strong> — needed to sign you in and sync your health profile</li>
+        </ul>
+        <p>The extension does not request access to sites outside these retailers and our own services.</p>
+      </section>
+
+      <section id="contact">
+        <h2>Contact</h2>
+        <p>Questions about this policy or requests to delete your data can be sent through the contact details listed on the NutriScore website, or by reaching out to the development team directly.</p>
+        <p><small>This policy may be updated as the extension evolves. Material changes will be reflected by the "last updated" date above.</small></p>
+      </section>
+
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-partners">
+      <span class="footer-partners-label">In partnership with</span>
+      <div class="footer-partners-logos">
+        <img src="assets/jhub-africa-logo.jpeg" alt="JHUB Africa" class="footer-partner-logo">
+        <img src="assets/jkuat-logo.jpeg" alt="Jomo Kenyatta University of Agriculture and Technology" class="footer-partner-logo">
+      </div>
+    </div>
+    <small>NutriScore — personalized nutrition hints while you shop.</small>
+    <div class="footer-links">
+      <a href="index.html">Home</a>
+      <span class="footer-links-sep">·</span>
+      <a href="privacy.html">Privacy Policy</a>
+    </div>
+  </footer>
+  <script>
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        document.querySelector(a.getAttribute('href'))
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+  </script>
+</body>
+</html>

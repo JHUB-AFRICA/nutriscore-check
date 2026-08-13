@@ -193,7 +193,7 @@ async function getProductInfo(payload, retailerCode) {
 // https://<extension-id>.chromiumapp.org/ — must be added under
 // "Authorized redirect URIs" for that client in Google Cloud Console.
 // ---------------------------------------------------------------------------
-const GOOGLE_WEB_CLIENT_ID = "923932588057-v6m40br659aabs7kaft90auc02sevjek.apps.googleusercontent.com";
+const GOOGLE_WEB_CLIENT_ID = "923932588057-diipd0assljkksbeurguf294uc8nb5br.apps.googleusercontent.com";
 const FIREBASE_API_KEY = "AIzaSyB05umupSWPt96qNWaevFJnS4ovaj907Gc";
 const FIREBASE_PROJECT_ID = "nutriscore-check";
 

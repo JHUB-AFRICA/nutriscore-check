@@ -20,7 +20,7 @@
     "https://firestore.googleapis.com/*"
   ],
   "oauth2": {
-    "client_id": "923932588057-vrp3kj4qlg0lvsak0gg0is2ndc8p4pbt.apps.googleusercontent.com",
+    "client_id": "923932588057-74ph0sibjcl0j14higm82l9vcant3stj.apps.googleusercontent.com",
     "scopes": ["openid", "email", "profile"]
   },
   "externally_connectable": {

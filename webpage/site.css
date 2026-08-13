@@ -1047,6 +1047,27 @@ a:hover {
   filter: grayscale(0%);
 }
 
+.footer-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 0.82rem;
+}
+
+.footer-links a {
+  color: var(--muted);
+}
+
+.footer-links a:hover {
+  color: var(--accent);
+}
+
+.footer-links .footer-links-sep {
+  color: var(--border);
+}
+
 code {
   background: #f1f5f9;
   padding: 3px 7px;
