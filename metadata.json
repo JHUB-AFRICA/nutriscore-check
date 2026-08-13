@@ -1,6 +1,0 @@
-{
-  "name": "NutriScore Checkout Tool",
-  "description": "Chrome Extension & Simulation Suite for nutritional evaluation on Kenyan grocery websites, including real-time badges, an analytics dashboard, and official Nutri-Score calculations.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
