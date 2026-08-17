@@ -649,34 +649,43 @@ var NutriScoreDB = (() => {
     const importStore = async (count, storeName, path) => {
       if (count === 0) {
         console.log(`[NutriScoreDB] Importing ${storeName}...`);
-        const res = await fetch(chrome.runtime.getURL(path));
-        if (res.ok) {
-          const data = await res.json();
-          const chunkSize = 500;
-          for (let i = 0; i < data.length; i += chunkSize) {
-            const chunk = data.slice(i, i + chunkSize);
-            const tx = db.transaction(storeName, "readwrite");
-            chunk.forEach((p) => tx.store.put(p));
-            await tx.done;
-            await new Promise((r) => setTimeout(r, 0));
+        try {
+          const res = await fetch(chrome.runtime.getURL(path));
+          if (res.ok) {
+            const data = await res.json();
+            const chunkSize = 500;
+            for (let i = 0; i < data.length; i += chunkSize) {
+              const chunk = data.slice(i, i + chunkSize);
+              const tx = db.transaction(storeName, "readwrite");
+              chunk.forEach((p) => tx.store.put(p));
+              await tx.done;
+              await new Promise((r) => setTimeout(r, 0));
+            }
+            const mTx = db.transaction("dataset_metadata", "readwrite");
+            mTx.store.put({
+              retailer: storeName.replace("Products", "").replace("Reference", "").toUpperCase(),
+              datasetVersion: "v2.0.0",
+              generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+              recordCount: data.length
+            });
+            await mTx.done;
+          } else {
+            console.error(`[NutriScoreDB] Failed to import ${storeName} from "${path}": HTTP ${res.status}. This store will remain empty.`);
           }
-          const mTx = db.transaction("dataset_metadata", "readwrite");
-          mTx.store.put({
-            retailer: storeName.replace("Products", "").replace("Reference", "").toUpperCase(),
-            datasetVersion: "v2.0.0",
-            generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
-            recordCount: data.length
-          });
-          await mTx.done;
-        } else {
-          console.error(`[NutriScoreDB] Failed to import ${storeName} from "${path}": HTTP ${res.status}. This store will remain empty.`);
+        } catch (err) {
+          // A missing/unreachable file (e.g. a stale filename) throws here
+          // rather than resolving with res.ok === false. Catch it locally so
+          // one bad dataset path can't reject the whole Promise.all below and
+          // repeatedly block product scoring for every retailer on every
+          // subsequent call (see: kfctReference outage, Aug 2026).
+          console.error(`[NutriScoreDB] Failed to fetch ${storeName} from "${path}": ${err.message}. This store will remain empty.`);
         }
       }
     };
     await Promise.all([
       importStore(cCount, "carrefourProducts", "data/carrefour_final.json"),
       importStore(nCount, "naivasProducts", "data/naivas_final.json"),
-      importStore(kCount, "kfctReference", "data/kfct2018_reference_validated.json")
+      importStore(kCount, "kfctReference", "data/kfct2018_reference_final.json")
     ]);
   }
   function resolveDisplayCategory(record) {

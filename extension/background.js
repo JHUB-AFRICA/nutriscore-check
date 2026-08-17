@@ -55,7 +55,13 @@ async function getProductInfo(payload, retailerCode) {
   
   const settings = await (NutriScoreDB.getSettings ? NutriScoreDB.getSettings() : { diabetes: true, hypertension: true, cardiovascular: true, kidney: true });
 
-  const cacheKey = retailer_product_id || url || product_name;
+  // A url that isn't a real http(s) page link (e.g. "javascript:void(0)"
+  // picked up from an unrelated icon/button by an adapter bug) must never
+  // be used as a cache key -- it's not unique per product, and every
+  // product sharing it would collapse onto one cached result. See:
+  // Naivas wishlist-icon cacheKey collision, Aug 2026.
+  const safeUrl = url && /^https?:\/\//i.test(url) ? url : null;
+  const cacheKey = retailer_product_id || safeUrl || product_name;
   if (cacheKey && typeof NutriScoreDB !== "undefined" && NutriScoreDB.getCachedProduct) {
     const cached = await NutriScoreDB.getCachedProduct(cacheKey);
     if (cached) {

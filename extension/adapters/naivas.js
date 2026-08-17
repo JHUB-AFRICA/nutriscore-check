@@ -60,6 +60,26 @@ const NaivasAdapter = {
       const id = card.getAttribute("data-product-id") || card.getAttribute("data-sku") || null;
       const hash = card.getAttribute("data-original-hash") || null;
 
+      // Pull the URL from the anchor that actually wraps the product name
+      // (nameEl), not just "the first a[href] in the card". Naivas cards
+      // also contain a wishlist-heart anchor (href="javascript:void(0)")
+      // that appears earlier in the DOM than the real product link -- a
+      // blind card.querySelector("a[href]") grabs that instead, and since
+      // every card's wishlist anchor has the identical "javascript:void(0)"
+      // href, every product on the page ended up sharing the same url and
+      // therefore the same product_cache key in db.js, causing every badge
+      // after the first to silently display the first scanned product's
+      // info (Aug 2026).
+      let productUrl = null;
+      const nameAnchor = nameEl?.closest ? nameEl.closest("a[href]") : null;
+      if (nameAnchor && !/^javascript:/i.test(nameAnchor.getAttribute("href") || "")) {
+        productUrl = nameAnchor.href;
+      } else {
+        const realLink = [...card.querySelectorAll("a[href]")]
+          .find(a => !/^javascript:/i.test(a.getAttribute("href") || ""));
+        productUrl = realLink ? realLink.href : null;
+      }
+
       products.push({
         domElement: card,
         id: id,
@@ -67,7 +87,7 @@ const NaivasAdapter = {
         nameHash: hash,
         price: priceNumeric,
         scrapedCategory: pageCategory,
-        url: card.querySelector("a[href]")?.href || null
+        url: productUrl
       });
     });
 
@@ -125,8 +145,14 @@ const NaivasAdapter = {
       E: { bg: "#e63b2e", txt: "#ffffff", label: "Very Poor" },
     };
 
-    const grade  = (productResult.nutriscore_grade || "C").toUpperCase();
-    const info   = gradeColors[grade] || gradeColors.C;
+    const rawGrade = (productResult.nutriscore_grade || "UNKNOWN").toUpperCase();
+    // A product with no score (UNKNOWN/NULL -- e.g. excluded categories or
+    // unmatched items) must never silently fall back to gradeColors.C: that
+    // renders as a real yellow "Moderate" badge, which misrepresents an
+    // unscored product as an actually-scored moderate one.
+    const isNoData = rawGrade === "UNKNOWN" || rawGrade === "NULL" || !gradeColors[rawGrade];
+    const grade = isNoData ? "—" : rawGrade;
+    const info  = isNoData ? { bg: "#e0e0e0", txt: "#555555", label: "No data" } : gradeColors[grade];
     const name   = this.escapeHTML(productResult.product_name || "");
     const prof   = productResult.nutritional_profile_display || {};
     const diseaseWarnings = productResult.diseaseWarnings || [];
@@ -182,6 +208,10 @@ const NaivasAdapter = {
         transition:transform .15s;user-select:none;
       }
       .badge-trigger:hover{transform:scale(1.05)}
+      .badge-trigger.badge-nodata{
+        width:auto;padding:0 8px;border-radius:8px;font-size:10px;font-weight:700;
+        letter-spacing:.2px;
+      }
       .flyout{
         display:none;position:absolute;top:calc(100% + 6px);left:0;
         width:268px;background:#fff;border-radius:10px;
@@ -232,12 +262,12 @@ const NaivasAdapter = {
     shadow.adoptedStyleSheets = [this.sharedStyleSheet];
 
     shadow.innerHTML = `
-      <div class="badge-trigger" style="--ns-bg: ${info.bg}; --ns-txt: ${info.txt};" title="NutriScore ${grade} — ${info.label}">${grade}</div>
+      <div class="badge-trigger${isNoData ? ' badge-nodata' : ''}" style="--ns-bg: ${info.bg}; --ns-txt: ${info.txt};" title="NutriScore ${isNoData ? 'No data' : grade + ' — ' + info.label}">${isNoData ? 'No data' : grade}</div>
       <div class="flyout">
         <button class="ns-close" style="display:none"></button>
         <div class="ns-header" style="--ns-bg: ${info.bg}; --ns-txt: ${info.txt};">
           <div class="ns-header-name">${name}</div>
-          <div class="ns-header-grade">NutriScore ${grade} — ${info.label}</div>
+          <div class="ns-header-grade">${isNoData ? 'No NutriScore data available' : 'NutriScore ' + grade + ' — ' + info.label}</div>
         </div>
         <div class="ns-section-title">Per 100g / 100ml</div>
         ${nutriRowsHTML}
