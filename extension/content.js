@@ -12,17 +12,10 @@ class NutriScoreContentEngine {
     this.processedElements = new Set();
     this.observer     = null;
     this.debounceTimer = null;
-    // Guards against re-logging the same cart line item if the retailer's
-    // page re-renders the DOM (e.g. on quantity change) within one visit.
-    this.loggedThisSession = new Set();
-    // Keys missing from the live cart on the most recent reconcileCart()
-    // pass, not yet confirmed removed -- see reconcileCart() for why.
-    this.pendingRemoval = new Set();
-    // Cached CHECK_PRODUCT_SCORE results, keyed the same way as
-    // loggedThisSession (prodInfo.id || prodInfo.name) -- lets the cart
-    // reconciliation pass re-badge a card whose DOM node got reused by the
-    // retailer's framework without re-fetching the score over the network.
-    this.productResultCache = new Map();
+    this.lastCartStr  = "";
+    this.lastCartHadItems = false;
+    this.orderDetected = false;
+    this.lastHref     = location.href;
   }
 
   init() {
@@ -34,15 +27,41 @@ class NutriScoreContentEngine {
     this.activeFlyouts = new Set();
 
     document.addEventListener("click", (e) => {
-      if (this.adapter && this.adapter.extractCartAction) {
-        const cartAction = this.adapter.extractCartAction(e.target);
-        if (cartAction) {
-          chrome.runtime.sendMessage({
-            action: "LOG_CART_EVENT",
-            payload: cartAction
-          });
+      if (this.adapter) {
+        let isRemove = false;
+        // Check for item removal first (highest priority)
+        if (this.adapter.extractRemoveAction) {
+          const removed = this.adapter.extractRemoveAction(e.target);
+          if (removed) {
+            isRemove = true;
+            if (removed.clearAll) {
+              // "Clear Cart" button — wipe all in_cart items immediately
+              chrome.runtime.sendMessage({
+                action: "CART_CLEARED",
+                retailer: removed.retailer
+              });
+              this.lastCartHadItems = false;
+              this.lastCartStr = "";
+            } else {
+              chrome.runtime.sendMessage({
+                action: "REMOVE_CART_ITEM",
+                payload: removed
+              });
+            }
+          }
+        }
+        // Check for add-to-cart only if not a remove action
+        if (!isRemove && this.adapter.extractCartAction) {
+          const item = this.adapter.extractCartAction(e.target);
+          if (item) {
+            chrome.runtime.sendMessage({
+              action: "LOG_CART_ADD",
+              payload: item
+            });
+          }
         }
       }
+
       if (this.activeFlyouts.size === 0) return;
       const path = e.composedPath();
       for (const shadow of this.activeFlyouts) {
@@ -63,44 +82,142 @@ class NutriScoreContentEngine {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg.action === "GET_PAGE_STATS") {
         const count = document.querySelectorAll('[data-nutriscore-scanned="complete"]').length;
+        const total = document.querySelectorAll('[data-nutriscore-scanned]').length;
         const retailer = this.adapter ? this.adapter.getRetailerCode() : null;
-        sendResponse({ count, retailer });
+        sendResponse({ count, total, retailer });
       }
     });
 
-    // 150ms debounce per topology specification (NFR-002, EV-002 lazy-loaded grids)
+    // 300ms debounce per topology specification
     this.observer = new MutationObserver(mutations => {
-      const isCart = this.adapter.isCartPage && this.adapter.isCartPage();
-
-      if (isCart) {
-        // On the cart page, any change (add OR remove) needs a full
-        // reconciliation pass -- see reconcileCart() for why removal
-        // can't be inferred from raw MutationObserver removedNodes here
-        // (the retailer's framework reuses/reindexes DOM nodes when the
-        // list shrinks, so "which node was removed" doesn't reliably
-        // correspond to "which product the customer removed").
-        const changed = mutations.some(m => m.addedNodes.length > 0 || m.removedNodes.length > 0);
-        if (changed) {
-          if (this.debounceTimer) clearTimeout(this.debounceTimer);
-          this.debounceTimer = setTimeout(() => this.reconcileCart(), 300);
-        }
-        return;
-      }
-
-      if (mutations.some(m => m.addedNodes.length > 0)) {
+      if (mutations.some(m => m.addedNodes.length > 0 || m.removedNodes.length > 0)) {
         if (this.debounceTimer) clearTimeout(this.debounceTimer);
-        this.debounceTimer = setTimeout(() => this.scanAndInject(), 300);
+        this.debounceTimer = setTimeout(() => {
+          this.scanAndInject();
+          this.syncCart();
+          this.checkOrderConfirmation();
+        }, 300);
       }
     });
 
     const observeTarget = (this.adapter.getObserveTarget && this.adapter.getObserveTarget()) || document.body;
     this.observer.observe(observeTarget, { childList: true, subtree: true });
 
+    // Monitor SPA navigations (Next.js / React Router do not fire full page loads)
+    this._startNavMonitor();
+
     this.notFoundCache = new Set();
-    if (this.adapter.isCartPage && this.adapter.isCartPage()) {
-      this.reconcileCart();
+    this.scanAndInject();
+    this.syncCart(true);
+    this.checkOrderConfirmation();
+  }
+
+  /**
+   * Poll for URL changes (covers SPA navigation on both Naivas and Carrefour).
+   * Falls back gracefully when the Navigation API is not available.
+   */
+  _startNavMonitor() {
+    // Modern Navigation API (Chrome 102+)
+    if (typeof navigation !== "undefined") {
+      navigation.addEventListener("navigate", () => {
+        setTimeout(() => {
+          this.orderDetected = false;
+          this.syncCart(true);
+          this.checkOrderConfirmation();
+        }, 800); // give the new page time to render
+      });
     } else {
-      this.scanAndInject();
+      // Polling fallback for older Chrome or Naivas (Magento multi-page)
+      setInterval(() => {
+        if (location.href !== this.lastHref) {
+          this.lastHref = location.href;
+          // Reset order detection flag on new page
+          this.orderDetected = false;
+          setTimeout(() => {
+            this.syncCart(true);
+            this.checkOrderConfirmation();
+          }, 800);
+        }
+      }, 1000);
+    }
+  }
+
+  /**
+   * Check whether the current page is an order confirmation page.
+   * If so, mark all in-cart items as purchased.
+   */
+  checkOrderConfirmation() {
+    if (this.orderDetected) return; // only fire once per page load
+    if (!this.adapter || !this.adapter.detectOrderConfirmation) return;
+
+    try {
+      if (this.adapter.detectOrderConfirmation()) {
+        this.orderDetected = true;
+        console.log("[NutriScore] Order confirmation detected -- marking cart as purchased.");
+        chrome.runtime.sendMessage({
+          action: "ORDER_PLACED",
+          retailer: this.adapter.getRetailerCode()
+        });
+      }
+    } catch (e) {
+      console.warn("[NutriScore] detectOrderConfirmation error:", e);
+    }
+  }
+
+  async syncCart(fetchApi = false) {
+    if (!this.adapter) return;
+    
+    let cartItems = [];
+    // 1. Extract from DOM (Sidebar/flyout if open)
+    if (this.adapter.extractCartState) {
+      cartItems = this.adapter.extractCartState();
+    }
+    
+    // 2. Auto-detect from API silently (only on page load or explicit navigation)
+    if (fetchApi && this.adapter.fetchCartFromAPI) {
+      const apiItems = await this.adapter.fetchCartFromAPI();
+      // Merge, giving preference to DOM items (what the user actually sees)
+      const itemMap = new Map();
+      cartItems.forEach(i => itemMap.set(i.productId, i));
+      apiItems.forEach(i => {
+        // Only add if not already extracted from DOM
+        if (!itemMap.has(i.productId)) {
+           itemMap.set(i.productId, i);
+        }
+      });
+      cartItems = Array.from(itemMap.values());
+    }
+    
+    // 3. Detect cart cleared: had items before, now empty
+    // Only detect cart cleared if we are actually checking the API, or if we know the cart DOM is visible.
+    // If we only check DOM (fetchApi=false) and the sidebar is closed, extractCartState returns [].
+    // To prevent false positives, we only trigger CART_CLEARED if fetchApi=true (which uses the true API state)
+    // OR if we know for sure the DOM cart is rendered but empty. For now, rely on fetchApi=true.
+    if (fetchApi && cartItems.length === 0 && this.lastCartHadItems) {
+      console.log("[NutriScore] Cart cleared -- updating dashboard.");
+      chrome.runtime.sendMessage({
+        action: "CART_CLEARED",
+        retailer: this.adapter.getRetailerCode()
+      });
+      this.lastCartHadItems = false;
+      this.lastCartStr = "";
+      return;
+    }
+
+    if (cartItems.length > 0) {
+      this.lastCartHadItems = true;
+    }
+
+    const cartStr = JSON.stringify(cartItems);
+    if (cartStr !== this.lastCartStr) {
+      this.lastCartStr = cartStr;
+      chrome.runtime.sendMessage({
+        action: "SYNC_CART_STATE",
+        payload: {
+          retailer: this.adapter.getRetailerCode(),
+          items: cartItems
+        }
+      });
     }
   }
 
@@ -122,7 +239,6 @@ class NutriScoreContentEngine {
       // Mark pending to prevent duplicate async fetches
       card.setAttribute("data-nutriscore-scanned", "pending");
       this.processedElements.add(card);
-      
 
       chrome.runtime.sendMessage(
         {
@@ -132,7 +248,8 @@ class NutriScoreContentEngine {
             product_name:        prodInfo.name,
             name_hash:           prodInfo.nameHash || null,
             retailer_product_id: prodInfo.id || null,
-            url:                 prodInfo.url || null
+            url:                 prodInfo.url || null,
+            price:               prodInfo.price || null
           }
         },
         response => {
@@ -150,8 +267,6 @@ class NutriScoreContentEngine {
             // Delegate all UI rendering to the adapter (no logic here)
             const shadowRoot = this.adapter.injectBadge(card, product, prodInfo.price);
             if (shadowRoot) this.activeFlyouts.add(shadowRoot);
-            // Cart-page logging lives in reconcileCart()/applyBadgeAndLog()
-            // now -- this method is only ever called for listing pages.
           } else {
             card.setAttribute("data-nutriscore-scanned", "not-found");
             if (cacheKey) this.notFoundCache.add(cacheKey);
@@ -159,163 +274,6 @@ class NutriScoreContentEngine {
         }
       );
     });
-  }
-
-  // Compares the cart's current live contents against what we've logged
-  // this session, instead of trying to interpret which DOM node was
-  // structurally removed. This is what actually makes removal detection
-  // reliable: the retailer's cart re-renders by index, so removing one
-  // item can reuse/reindex the remaining items' DOM nodes rather than
-  // cleanly removing just the one node for the removed product -- raw
-  // MutationObserver removedNodes ends up pointing at the wrong product
-  // (or the wrong number of products) when that happens. detectProducts()
-  // always reads current DOM content fresh, so re-running it and diffing
-  // against loggedThisSession is accurate regardless of node reuse.
-  reconcileCart() {
-    if (!this.adapter) return;
-
-    const products = this.adapter.detectProducts();
-    const currentKeys = new Set(products.map(p => p.id || p.name).filter(Boolean));
-
-    // Don't act on a single snapshot -- the retailer's own cart usually
-    // recalculates (subtotal, delivery threshold, etc.) via its own API
-    // call after each removal, which can render the list empty or
-    // partial for a moment before the real updated one arrives. Reading
-    // that transient state as "everything was removed" was very likely
-    // what caused this to work for a while and then misbehave again
-    // partway through a sequence of removals -- it only goes wrong when
-    // reconciliation happens to land inside that window. Requiring a key
-    // to be missing on two consecutive passes (300ms apart) before
-    // treating it as a real removal filters that out, at the cost of one
-    // extra debounce cycle of latency on genuine removals.
-    const missingNow = new Set();
-    for (const key of this.loggedThisSession) {
-      if (!currentKeys.has(key)) missingNow.add(key);
-    }
-    for (const key of this.pendingRemoval) {
-      if (missingNow.has(key)) {
-        this.loggedThisSession.delete(key);
-        this.productResultCache.delete(key);
-        chrome.runtime.sendMessage({ action: "REMOVE_CART_EVENT", payload: { productId: key } });
-      }
-    }
-    this.pendingRemoval = missingNow;
-
-    // The second confirmation pass above normally arrives on its own,
-    // triggered by whatever mutation the retailer's real update causes
-    // (there's almost always at least one, since anything involving a
-    // server round-trip is inherently a separate mutation batch from the
-    // initial optimistic DOM update). But a purely local, single-shot
-    // removal with no follow-up render wouldn't generate a second
-    // mutation at all -- without this, that key would stay stuck in
-    // pendingRemoval forever, waiting on a confirmation pass that never
-    // comes. This guarantees one arrives regardless.
-    if (missingNow.size > 0) {
-      if (this.removalConfirmTimer) clearTimeout(this.removalConfirmTimer);
-      this.removalConfirmTimer = setTimeout(() => this.reconcileCart(), 800);
-    } else if (this.removalConfirmTimer) {
-      clearTimeout(this.removalConfirmTimer);
-      this.removalConfirmTimer = null;
-    }
-
-    products.forEach(prodInfo => this.processCartItem(prodInfo));
-  }
-
-  // Per-item half of reconcileCart(). Split out so a cached result (from
-  // an earlier CHECK_PRODUCT_SCORE this visit) can re-badge a reused DOM
-  // node instantly, without waiting on -- or repeating -- a network call.
-  processCartItem(prodInfo) {
-    const card = prodInfo.domElement;
-    const cacheKey = prodInfo.id || prodInfo.name;
-    if (!cacheKey) return;
-
-    const cached = this.productResultCache.get(cacheKey);
-    if (cached) {
-      this.applyBadgeAndLog(card, cacheKey, prodInfo, cached);
-      return;
-    }
-
-    // A reused node re-enters this on every reconciliation pass until its
-    // lookup resolves -- avoid firing a second one while it's in flight.
-    if (card.getAttribute("data-nutriscore-scanned") === "pending") return;
-    card.setAttribute("data-nutriscore-scanned", "pending");
-
-    chrome.runtime.sendMessage(
-      {
-        action:  "CHECK_PRODUCT_SCORE",
-        retailer: this.adapter.getRetailerCode(),
-        payload: {
-          product_name:        prodInfo.name,
-          name_hash:           prodInfo.nameHash || null,
-          retailer_product_id: prodInfo.id || null,
-          url:                 prodInfo.url || null
-        }
-      },
-      response => {
-        if (chrome.runtime.lastError) {
-          console.warn("[NutriScore] SW message error:", chrome.runtime.lastError.message);
-          card.removeAttribute("data-nutriscore-scanned");
-          return;
-        }
-        if (response && response.status === "SUCCESS" && response.data) {
-          this.productResultCache.set(cacheKey, response.data);
-          this.applyBadgeAndLog(card, cacheKey, prodInfo, response.data);
-        } else {
-          card.setAttribute("data-nutriscore-scanned", "not-found");
-        }
-      }
-    );
-  }
-
-  // Shared tail of both the cached and freshly-fetched paths in
-  // processCartItem(): paints the badge and, the first time this cacheKey
-  // is seen this visit, logs it to shopping_ledger. Row shape is matched
-  // exactly to what the dashboard's compiled bundle reads (flat
-  // sodiumMg/sugarsG/satFatG fields, not nested; name/category/grade for
-  // the table; addedAt for sorting). The `id` prefix here (cacheKey) is
-  // the same key REMOVE_CART_EVENT matches against in db.js, so it must
-  // stay derived from prodInfo (retailer-scraped identity), not from
-  // product.productId (our own catalog-matching id) -- the two aren't
-  // guaranteed to agree, and reconciliation depends on one consistent key.
-  applyBadgeAndLog(card, cacheKey, prodInfo, product) {
-    card.setAttribute("data-nutriscore-scanned", "complete");
-    card.setAttribute("data-nutriscore-grade",   product.nutriscore_grade);
-
-    // injectBadge() adds a DOM node, which the same MutationObserver that
-    // called reconcileCart() is watching -- re-running it every pass even
-    // when nothing changed would re-trigger reconcileCart() forever (badge
-    // added -> mutation fires -> reconcile -> badge "re"-added -> ...).
-    // Skipping when the badge is already correct breaks that loop.
-    // injectBadge() appends the badge to findRowAnchor(card), which can be
-    // an ancestor of card rather than card itself -- check there, not on
-    // card, or an already-correct badge would never be found and this
-    // would re-inject (and re-trigger the mutation loop) every pass.
-    const badgeAnchor = (this.adapter.findRowAnchor && this.adapter.findRowAnchor(card)) || card;
-    const badgeCurrent =
-      badgeAnchor.querySelector(":scope > .nutriscore-isolated-root") &&
-      card.getAttribute("data-nutriscore-grade") === product.nutriscore_grade;
-    if (!badgeCurrent) {
-      const shadowRoot = this.adapter.injectBadge(card, product, prodInfo.price);
-      if (shadowRoot) this.activeFlyouts.add(shadowRoot);
-    }
-
-    if (!this.loggedThisSession.has(cacheKey)) {
-      this.loggedThisSession.add(cacheKey);
-      const nutrition = product.nutritional_profile_display || {};
-      chrome.runtime.sendMessage({
-        action: "LOG_CART_EVENT",
-        payload: {
-          id:       `${cacheKey}-${Date.now()}`,
-          addedAt:  Date.now(),
-          name:     product.product_name || prodInfo.name,
-          category: product.fsaCategory || "GENERAL_FOOD",
-          grade:    product.nutriscore_grade,
-          sodiumMg: Number(nutrition.sodium_mg) || 0,
-          sugarsG:  Number(nutrition.sugars_g)  || 0,
-          satFatG:  Number(nutrition.sat_fat_g) || 0
-        }
-      });
-    }
   }
 }
 

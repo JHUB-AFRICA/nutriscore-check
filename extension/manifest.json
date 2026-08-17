@@ -3,29 +3,13 @@
   "name": "NutriScore Checkout Tool (Kenya)",
   "version": "1.1.0",
   "description": "Real-time NutriScore grades with disease-specific dietary flags for Naivas and Carrefour Kenya.",
-  "permissions": [
-    "storage",
-    "activeTab",
-    "scripting",
-    "identity"
-  ],
+  "permissions": [],
   "host_permissions": [
     "*://*.naivas.online/*",
     "*://*.naivas.co.ke/*",
     "*://*.carrefour.ke/*",
-    "*://*.carrefourkenya.com/*",
-    "https://nutriscore-check.vercel.app/*",
-    "https://identitytoolkit.googleapis.com/*",
-    "https://securetoken.googleapis.com/*",
-    "https://firestore.googleapis.com/*"
+    "*://*.carrefourkenya.com/*"
   ],
-  "oauth2": {
-    "client_id": "923932588057-vrp3kj4qlg0lvsak0gg0is2ndc8p4pbt.apps.googleusercontent.com",
-    "scopes": ["openid", "email", "profile"]
-  },
-  "externally_connectable": {
-    "matches": ["https://nutriscore-check.vercel.app/*"]
-  },
   "background": {
     "service_worker": "background.js"
   },
@@ -36,6 +20,8 @@
         "*://*.naivas.co.ke/*"
       ],
       "js": [
+        "adapters/grade-colors.js",
+        "adapters/shared-ui.js",
         "adapters/naivas.js",
         "content.js"
       ],
@@ -47,28 +33,28 @@
         "*://*.carrefourkenya.com/*"
       ],
       "js": [
+        "adapters/grade-colors.js",
+        "adapters/shared-ui.js",
         "adapters/carrefour.js",
         "content.js"
       ],
       "run_at": "document_end"
     }
   ],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
-      "16": "icons/icon.svg",
-      "48": "icons/icon.svg",
-      "128": "icons/icon.svg"
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
     }
   },
-  "options_page": "dashboard.html",
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "dashboard.html",
-        "db.js"
-      ],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  "options_page": "dashboard.html"
 }
