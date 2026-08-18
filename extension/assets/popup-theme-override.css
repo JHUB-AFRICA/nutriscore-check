@@ -1,0 +1,57 @@
+/* NutriScore popup — theme override to match the main site's green/Inter
+   look, without touching the compiled React bundle. Loaded AFTER
+   index-7ZM78C03.css so these values win the cascade. */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  /* Site accent green (matches webpage/site.css) instead of the default
+     near-black --primary, used for the main CTA button + avatar fallback */
+  --primary: #16a34a;
+  --primary-foreground: #ffffff;
+
+  --radius: 0;
+}
+
+/* Square off the card, rows, and buttons — no rounded corners anywhere
+   except the avatar circle, which stays round on purpose. */
+#root .rounded-lg,
+#root .rounded-md,
+#root .rounded-xl {
+  border-radius: 0 !important;
+}
+
+html, body, #root {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+/* Give the whole popup card the same soft mint-to-white gradient wash and
+   border the main site uses, instead of flat white */
+#root > div {
+  background: linear-gradient(180deg, rgba(236, 253, 245, 0.6), #ffffff 60px) !important;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 30px rgba(22, 163, 74, 0.08);
+}
+
+/* The "N" logo mark: swap the flat grade-green fill for the site's
+   diagonal green gradient + a matching soft shadow. (Nested one level
+   deeper than before — the logo+title are now wrapped in their own
+   container alongside the health-details button.) */
+#root > div > div:first-child > div:first-child > div:first-child {
+  background: linear-gradient(135deg, #16a34a, #34d399) !important;
+  box-shadow: 0 8px 18px rgba(22, 163, 74, 0.22);
+}
+
+/* The two light-grey info rows (status pill + "items graded" row) — retint
+   from neutral grey to the site's soft-mint accent background */
+.bg-\[\#f6f7f9\] {
+  background-color: #ecfdf5 !important;
+}
+
+/* Buttons and pills get a touch more lift on hover, matching the site */
+#root button {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+#root button:hover {
+  transform: translateY(-1px);
+}

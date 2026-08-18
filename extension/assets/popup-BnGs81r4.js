@@ -1,5 +1,12 @@
 import{c as y,R as v,b as R,k as l,d as r,h as b}from"./index-CGe2_yMy.js";
 /**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * BackgroundServiceWorker — popup UI (Vite/React build)
+ */
+
+/**
  * @license lucide-react v0.487.0 - ISC
  *
  * This source code is licensed under the ISC license.
@@ -56,14 +63,77 @@ function AccountRow({user,signingIn,authError,onSignIn,onSignOut}){
   );
 }
 
-function w({siteActive:t,siteName:a,scoredCount:o,totalCount:n,onOpenDashboard:c,user:u,signingIn:s,authError:er,onSignIn:si,onSignOut:so}){
+// ---------------------------------------------------------------------------
+// Health details: renders whatever health profile the website last saved
+// (or the extension last synced via HEALTH_SYNC / GET_HEALTH_PROFILE).
+// ---------------------------------------------------------------------------
+function formatLabel(v){
+  return String(v).replace(/-/g," ").replace(/\b\w/g,c=>c.toUpperCase());
+}
+
+function ChipGroup({label,items}){
+  return React.createElement("div",{style:{marginBottom:"10px"}},
+    React.createElement("p",{style:{margin:"0 0 6px",fontWeight:700,fontSize:"0.78rem",color:"var(--foreground)"}},label),
+    (items&&items.length)
+      ? React.createElement("div",null,
+          items.map((v,idx)=>React.createElement("span",{
+            key:idx,
+            style:{display:"inline-block",padding:"3px 10px",borderRadius:"999px",background:"#ecfdf5",color:"var(--primary)",fontSize:"0.74rem",fontWeight:700,margin:"2px 4px 2px 0"}
+          },formatLabel(v)))
+        )
+      : React.createElement("span",{style:{color:"var(--muted-foreground)",fontSize:"0.78rem"}},"None selected")
+  );
+}
+
+function HealthPanel({health}){
+  if(!health){
+    return React.createElement("p",{style:{margin:0,color:"var(--muted-foreground)",fontSize:"0.8rem"}},
+      "No health details saved yet. Add them on the NutriScore website and they'll show up here.");
+  }
+  const details=[];
+  if(health.age!=null&&health.age!=="")details.push(`Age ${health.age}`);
+  if(health.gender)details.push(formatLabel(health.gender));
+  if(health.allergies)details.push(`Allergies: ${health.allergies}`);
+  return React.createElement("div",null,
+    details.length
+      ? React.createElement("p",{style:{margin:"0 0 10px",fontSize:"0.78rem",color:"var(--muted-foreground)"}},details.join(" · "))
+      : null,
+    React.createElement(ChipGroup,{label:"Health conditions",items:health.conditions}),
+    React.createElement(ChipGroup,{label:"Dietary preferences",items:health.dietaryPreferences})
+  );
+}
+
+function w({siteActive:t,siteName:a,scoredCount:o,totalCount:n,onOpenDashboard:c,user:u,signingIn:s,authError:er,onSignIn:si,onSignOut:so,health:hp,healthOpen:ho,onToggleHealth:oh}){
+  const hasHealth=!!hp;
   return React.createElement("div",{className:"overflow-hidden rounded-xl bg-white",style:{width:"max-content",minWidth:280,maxWidth:360}},
-    React.createElement("div",{className:"flex items-center gap-2 px-4 pb-3 pt-4"},
-      React.createElement("div",{className:"grid size-8 place-items-center rounded-lg",style:{backgroundColor:"var(--ns-grade-a)",color:"#fff"}},
-        React.createElement("span",{style:{fontWeight:700}},"N")
+    React.createElement("div",{className:"flex items-center justify-between gap-2 px-4 pb-3 pt-4"},
+      React.createElement("div",{className:"flex items-center gap-2"},
+        React.createElement("div",{className:"grid size-8 place-items-center rounded-lg",style:{backgroundColor:"var(--ns-grade-a)",color:"#fff"}},
+          React.createElement("span",{style:{fontWeight:700}},"N")
+        ),
+        React.createElement("div",null,
+          React.createElement("p",{style:{fontWeight:700,fontSize:"1.05rem",paddingLeft:"2px"}},"NutriScore")
+        )
       ),
-      React.createElement("div",null,
-        React.createElement("p",{style:{fontWeight:700,fontSize:"1.05rem",paddingLeft:"2px"}},"NutriScore")
+      React.createElement("button",{
+        type:"button",
+        onClick:oh,
+        title:"View health details",
+        "aria-label":"View health details",
+        className:"grid size-8 place-items-center rounded-lg transition-opacity hover:opacity-90",
+        style:{
+          border:"1.5px solid "+(hasHealth?"var(--primary)":"rgba(0,0,0,0.1)"),
+          backgroundColor:hasHealth?"#ecfdf5":"#fff",
+          color:hasHealth?"var(--primary)":"var(--muted-foreground)",
+          flexShrink:0
+        }
+      },
+        React.createElement("svg",{width:14,height:14,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round","aria-hidden":!0},
+          React.createElement("path",{d:"M8 2v4"}),
+          React.createElement("path",{d:"M16 2v4"}),
+          React.createElement("rect",{width:18,height:18,x:3,y:4,rx:2}),
+          React.createElement("path",{d:"M3 10h18"})
+        )
       )
     ),
     React.createElement(AccountRow,{user:u,signingIn:s,authError:er,onSignIn:si,onSignOut:so}),
@@ -77,6 +147,11 @@ function w({siteActive:t,siteName:a,scoredCount:o,totalCount:n,onOpenDashboard:c
         (n??0)>0?` of ${n} items graded`:" items graded"
       )
     ),
+    ho
+      ? React.createElement("div",{className:"mx-4 mt-3 rounded-lg border border-black/5 px-3 py-3"},
+          React.createElement(HealthPanel,{health:hp})
+        )
+      : null,
     React.createElement("div",{className:"p-4"},
       React.createElement("button",{
         type:"button",
@@ -96,6 +171,8 @@ function N(){
   const[user,setUser]=r(null);
   const[signingIn,setSigningIn]=r(!1);
   const[authError,setAuthError]=r(null);
+  const[health,setHealth]=r(null);
+  const[healthOpen,setHealthOpen]=r(!1);
 
   b(()=>{
     function i(){
@@ -127,6 +204,31 @@ function N(){
     });
   },[]);
 
+  // Load whatever health profile is currently cached (populated either by
+  // the extension's own sign-in, or synced in from the website via
+  // HEALTH_SYNC) so the button can reflect it right away on popup open.
+  b(()=>{
+    if(typeof chrome>"u"||!chrome.runtime)return;
+    chrome.runtime.sendMessage({action:"GET_HEALTH_PROFILE"},res=>{
+      if(chrome.runtime.lastError)return;
+      if(res&&res.status==="SUCCESS")setHealth(res.data||null);
+    });
+  },[]);
+
+  // Live-update if background.js writes a fresh user/healthProfile while
+  // this popup happens to be open (e.g. sign-in completing in a separate
+  // window, or the website pushing a HEALTH_SYNC after a save).
+  b(()=>{
+    if(typeof chrome>"u"||!chrome.storage||!chrome.storage.onChanged)return;
+    function onChange(changes,area){
+      if(area!=="local")return;
+      if(changes.user)setUser(changes.user.newValue||null);
+      if(changes.healthProfile)setHealth(changes.healthProfile.newValue||null);
+    }
+    chrome.storage.onChanged.addListener(onChange);
+    return()=>chrome.storage.onChanged.removeListener(onChange);
+  },[]);
+
   function handleSignIn(){
     setAuthError(null);
     setSigningIn(!0);
@@ -144,14 +246,21 @@ function N(){
   function handleSignOut(){
     chrome.runtime.sendMessage({action:"SIGN_OUT"},()=>{
       setUser(null);
+      setHealth(null);
+      setHealthOpen(!1);
     });
+  }
+
+  function handleToggleHealth(){
+    setHealthOpen(v=>!v);
   }
 
   return l(w,{
     siteActive:t,siteName:o,scoredCount:c,totalCount:m,
     onOpenDashboard:()=>chrome.runtime.openOptionsPage(),
     user,signingIn,authError,
-    onSignIn:handleSignIn,onSignOut:handleSignOut
+    onSignIn:handleSignIn,onSignOut:handleSignOut,
+    health,healthOpen,onToggleHealth:handleToggleHealth
   });
 }
 

@@ -8,22 +8,34 @@ const NaivasAdapter = {
     return "NAIVAS";
   },
 
-  // No confirmed selector yet for Naivas' actual cart page/list (the
-  // Carrefour equivalent, #entries-SLOTTED, was found via a live
-  // DevTools inspection -- Naivas hasn't had the same check done).
-  // Returns false for now, so cart-page logging simply doesn't fire
-  // here yet rather than risk logging things that aren't really in
-  // the cart. Same diagnostic approach as Carrefour would confirm the
-  // real container if/when needed.
+  // Confirmed real container for the cart page's line items (found via
+  // live DevTools inspection, same approach as Carrefour's entries-SLOTTED).
+  // Distinct from the "Frequently Purchased" carousel below it, which uses
+  // ordinary grid-card markup and would otherwise get matched instead.
+  // The cart-wrapper class combo (rounded box, padding, flex-column, gap-4)
+  // is a generic Tailwind card style -- nothing guarantees it's unique to
+  // the cart page alone. Gating on the URL too means a coincidental match
+  // elsewhere on the site can never hijack detection away from normal
+  // product-grid scanning.
+  _onCartUrl() {
+    return /\/cart(\/|$|\?)/.test(location.pathname);
+  },
+
   isCartPage() {
-    return false;
+    return this._onCartUrl() && !!document.querySelector(".bg-naivas-gray-light.rounded-xl.flex.flex-col.gap-4");
   },
 
   getObserveTarget() {
-    return document.querySelector(".products.wrapper.grid.products-grid") || document.querySelector(".page-main") || document.body;
+    return (this._onCartUrl() && document.querySelector(".bg-naivas-gray-light.rounded-xl.flex.flex-col.gap-4"))
+      || document.querySelector(".products.wrapper.grid.products-grid") || document.querySelector(".page-main") || document.body;
   },
 
   detectProducts() {
+    const cartWrapper = this._onCartUrl()
+      ? document.querySelector(".bg-naivas-gray-light.rounded-xl.flex.flex-col.gap-4")
+      : null;
+    if (cartWrapper) return this.detectCartItems(cartWrapper);
+
     const products = [];
     const productSelector = "[class*='border-naivas-bg'], .product-item";
     const nameSelector = "span.line-clamp-2, [class*='line-clamp'], .product-item-name a, a[href*='.html'], h3, h4";
@@ -94,6 +106,50 @@ const NaivasAdapter = {
     return products;
   },
 
+  // Cart page line items don't share the grid card's classes, so they need
+  // their own extraction: the product ID only exists inside a Livewire
+  // wire:click attribute (e.g. redirectToProductPage(9350)), the name is
+  // the linked anchor's title, and price is the ".font-extrabold" KES
+  // figure -- confirmed against the real cart DOM (Aug 2026).
+  detectCartItems(cartWrapper) {
+    const products = [];
+    const items = [...cartWrapper.children].filter(el => el.tagName === "DIV");
+
+    items.forEach(card => {
+      if (card.querySelector(".nutriscore-isolated-root")) return;
+
+      const linkEl = card.querySelector('a[wire\\:click*="redirectToProductPage"]');
+      let id = null;
+      if (linkEl) {
+        const wireClick = linkEl.getAttribute("wire:click") || "";
+        const match = wireClick.match(/redirectToProductPage\((\d+)\)/);
+        if (match) id = match[1];
+      }
+      if (!id) return;
+
+      const name = linkEl.getAttribute("title") || linkEl.textContent?.trim() || "";
+      if (!name) return;
+
+      let priceNumeric = 0;
+      const priceEl = card.querySelector(".font-extrabold");
+      if (priceEl) {
+        priceNumeric = parseFloat((priceEl.textContent || "").replace(/[^0-9.]/g, "")) || 0;
+      }
+
+      products.push({
+        domElement:      card,
+        id:              id,
+        name:            name,
+        nameHash:        null,
+        price:           priceNumeric,
+        scrapedCategory: "",
+        url:             null
+      });
+    });
+
+    return products;
+  },
+
   // Climbs up from a detected product element to find the actual
   // full-width row/card container. detectProducts() sometimes matches
   // a narrower inner wrapper (e.g. just the image+name column) rather
@@ -125,15 +181,27 @@ const NaivasAdapter = {
     // stacking duplicates.
     card.querySelectorAll(".nutriscore-isolated-root").forEach(el => el.remove());
 
-    const anchorEl = this.findRowAnchor(card);
-    if (anchorEl !== card) {
+    const inCart = this._onCartUrl() && !!card.closest(".bg-naivas-gray-light.rounded-xl.flex.flex-col.gap-4");
+    const nameLinkEl = inCart
+      ? card.querySelector('a.font-semibold[wire\\:click*="redirectToProductPage"]')
+      : null;
+
+    let anchorEl = card;
+    let badgeStyle = "position:absolute;top:8px;right:8px;z-index:1000;";
+
+    if (inCart && nameLinkEl) {
+      // Inline, right next to the product name -- not a corner overlay --
+      // per how the cart row is actually read (name-led, not image-led).
+      badgeStyle = "display:inline-flex;vertical-align:middle;margin-left:8px;position:static;";
+    } else {
+      anchorEl = this.findRowAnchor(card);
       const currentPosition = getComputedStyle(anchorEl).position;
       if (currentPosition === "static") anchorEl.style.position = "relative";
     }
 
     const badgeContainer = document.createElement("div");
     badgeContainer.className = "nutriscore-isolated-root";
-    badgeContainer.style.cssText = "position:absolute;top:8px;right:8px;z-index:1000;";
+    badgeContainer.style.cssText = badgeStyle;
 
     const shadow = badgeContainer.attachShadow({ mode: "open" });
 
@@ -287,7 +355,11 @@ const NaivasAdapter = {
     if (closeBtn) closeBtn.addEventListener("click", () => flyout.classList.remove("open"));
 
     card.setAttribute("data-nutriscore-id", productResult.productId || "");
-    anchorEl.appendChild(badgeContainer);
+    if (inCart && nameLinkEl) {
+      nameLinkEl.insertAdjacentElement("afterend", badgeContainer);
+    } else {
+      anchorEl.appendChild(badgeContainer);
+    }
     return shadow;
   },
 

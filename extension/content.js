@@ -230,7 +230,20 @@ class NutriScoreContentEngine {
       const card = prodInfo.domElement;
       const cacheKey = prodInfo.id || prodInfo.name;
 
-      if (this.processedElements.has(card)) return;
+      if (this.processedElements.has(card)) {
+        // Already scanned once, but the badge may have been wiped by a
+        // page-side re-render (e.g. Naivas/Livewire morphing the row) that
+        // keeps the same DOM node while stripping elements it doesn't
+        // recognise. If the badge is gone, treat this as needing a fresh
+        // scan rather than leaving it silently blank forever -- but not
+        // while a request for this same card is still in flight, or the
+        // response landing later would duplicate the request and cause
+        // the badge to flicker as both responses race to inject/replace it.
+        if (card.querySelector(".nutriscore-isolated-root")) return;
+        if (card.getAttribute("data-nutriscore-scanned") === "pending") return;
+        this.processedElements.delete(card);
+        card.removeAttribute("data-nutriscore-scanned");
+      }
       if (cacheKey && this.notFoundCache.has(cacheKey)) {
         card.setAttribute("data-nutriscore-scanned", "not-found");
         return;
