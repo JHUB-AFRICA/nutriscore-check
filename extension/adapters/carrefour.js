@@ -138,12 +138,19 @@ const CarrefourAdapter = {
     card.querySelectorAll(".nutriscore-isolated-root").forEach(el => el.remove());
 
     const anchorEl = this.findRowAnchor(card);
-    const currentPosition = getComputedStyle(anchorEl).position;
-    if (currentPosition === "static") anchorEl.style.position = "relative";
+    const anchorStyle = getComputedStyle(anchorEl);
+    if (anchorStyle.position === "static") anchorEl.style.position = "relative";
+    // A positioned ancestor with z-index:auto does NOT establish a new
+    // stacking context -- our badge's z-index would then be compared
+    // against the whole page (headers, sticky nav, etc.) instead of being
+    // contained within the card. Give the anchor an explicit z-index so it
+    // forms its own stacking context and the badge can never bleed above
+    // page chrome, no matter how high its internal z-index is.
+    if (anchorStyle.zIndex === "auto") anchorEl.style.zIndex = "0";
 
     const badgeContainer = document.createElement("div");
     badgeContainer.className  = "nutriscore-isolated-root";
-    badgeContainer.style.cssText = "position:absolute;top:8px;right:8px;z-index:1000;";
+    badgeContainer.style.cssText = "position:absolute;top:8px;right:8px;z-index:2;";
 
     const shadow = badgeContainer.attachShadow({ mode: "open" });
 
@@ -291,12 +298,22 @@ const CarrefourAdapter = {
     const trigger = shadow.querySelector(".badge-trigger");
     const flyout  = shadow.querySelector(".flyout");
 
+    const restingZ = anchorEl.style.zIndex;
     trigger.addEventListener("click", e => {
       e.preventDefault(); e.stopPropagation();
+      const willOpen = !flyout.classList.contains("open");
       flyout.classList.toggle("open");
+      // See the matching comment in naivas.js -- the anchor's z-index:0
+      // keeps the badge contained under page chrome, but also means a
+      // sibling card can paint over an open flyout that spills past its
+      // own card's edge. Temporarily outrank siblings only while open.
+      anchorEl.style.zIndex = willOpen ? "30" : restingZ;
     });
     const closeBtn = shadow.querySelector(".ns-close");
-    if (closeBtn) closeBtn.addEventListener("click", () => flyout.classList.remove("open"));
+    if (closeBtn) closeBtn.addEventListener("click", () => {
+      flyout.classList.remove("open");
+      anchorEl.style.zIndex = restingZ;
+    });
 
     // Force relative positioning without reading computed style to avoid Layout Thrashing
     card.setAttribute("data-nutriscore-id", productResult.productId || "");
