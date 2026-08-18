@@ -88,17 +88,18 @@ NutriScore is a free browser extension that shows you an at-a-glance A–E nutri
 
 ### 3.3 Making Healthy Substitutions
 
-**Overview:** When you view a lower-graded product, NUT-04 is designed to look for a similar product in the same food category that's graded higher and priced the same or less, and suggest it as a swap — particularly useful if you're buying in bulk on a time budget and want a fast, confident substitution rather than a research project.
+**Overview:** When you view a lower-graded product, NUT-04 looks for a similar product in the same food category, from the same store, that's graded higher, and suggests it as a swap — particularly useful if you're buying in bulk on a time budget and want a fast, confident substitution rather than a research project.
 
-**Current status:** This feature is still being finished on our end. If you don't see suggestions yet on a product that seems like it should have them, that's expected for now, not a bug on your device — see our roadmap for progress.
+**Current status:** This feature is live. If a product doesn't show any suggestions, it usually means nothing in its category currently qualifies — either nothing is graded higher, or nothing is priced close enough (see below) — not a bug on your device.
 
-**Tips for when it's live:**
-- Alternatives will always be drawn from the same food category and the same retailer as the product you're viewing, and never priced higher.
-- Each suggestion will explain *why* — the grade comparison and which specific nutrients improved — not just a bare "try this instead."
+**Good to know:**
+- Alternatives are always drawn from the same food category and the same retailer as the product you're viewing, and are always graded A, B, or C — never D or E.
+- Price is a factor, not a hard cap: suggestions are prioritized within about 30% of the original product's price (widened to 50% if fewer than three close matches exist), so an alternative can occasionally cost a bit more, not just the same or less.
+- Each suggestion explains *why* — the grade comparison and which specific nutrients improved — not just a bare "try this instead."
 
 ### 3.4 Tracking Your Shopping Health Over Time
 
-**Overview:** Every item you add to your Naivas or Carrefour Kenya cart is automatically logged — no manual entry needed — to a private, on-device shopping ledger. Nothing leaves your browser unless you explicitly sign in to sync.
+**Overview:** Every item you add to your Naivas or Carrefour Kenya cart is automatically logged — no manual entry needed — to a private, on-device shopping ledger. Nothing ever leaves your browser: there's currently no sign-in and no sync feature of any kind, on this device or across devices.
 
 **Step-by-step Guide**
 1. Shop normally — add and remove items as usual.
@@ -144,13 +145,13 @@ Grades are only as good as the nutrition data behind them. We label each product
 <details>
 <summary>What shopping data does NUT-04 use?</summary>
 
-By default, everything — your cart contents, the grades you've viewed, and your shopping trends — stays stored locally in your browser's own on-device database. Nothing is sent to any server unless you choose to sign in for cross-device sync (currently in development). Only the product names on the page you're viewing are ever used to look up a grade, and that lookup happens entirely against data already bundled with the extension — not sent to any outside nutrition database.
+By default, everything — your cart contents, the grades you've viewed, and your shopping trends — stays stored locally in your browser's own on-device database. Nothing is ever sent to any server: there's no sign-in and no cross-device sync feature in the extension today. Only the product names on the page you're viewing are ever used to look up a grade, and that lookup happens entirely against data already bundled with the extension — not sent to any outside nutrition database.
 </details>
 
 <details>
 <summary>Can I delete my data?</summary>
 
-Yes — a "delete all my data" option is intended to be available in Settings, clearing your shopping ledger from your device immediately. If you can't find it in your current version, please let us know via GitHub Issues so we can confirm it's exposed correctly in your build.
+Yes — a "delete all my data" option is available from the Dashboard, clearing your shopping ledger from your device immediately.
 </details>
 
 ### 4.4 Account & Settings
@@ -170,7 +171,7 @@ Open Settings from the popup or the Dashboard's options page and toggle diabetes
 | Issue | Suggested Fix |
 |---|---|
 | Score not showing at checkout | Make sure you're on a product *listing* page — badges appear on product cards, not every page type. Try refreshing; if the page uses infinite scroll, scroll down slightly to trigger a re-scan. If it still doesn't appear after a few seconds, the product may not yet be in our database. |
-| Substitution suggestions not appearing | This feature is still being finished — see our roadmap for current status. |
+| Substitution suggestions not appearing | This feature is live. It usually means nothing in that product's category currently qualifies — either nothing is graded higher, or nothing is priced close enough — rather than a bug. |
 | A warning seems to conflict with the general grade | This is expected — a warning flags one specific nutrient crossing one specific threshold for a condition you've turned on; it isn't meant to override the overall A–E grade, which weighs several nutrients together. |
 | Widget appears broken/misaligned | This can happen if the retailer recently redesigned part of their site. Please report it via the feedback link so we can update our detection. |
 

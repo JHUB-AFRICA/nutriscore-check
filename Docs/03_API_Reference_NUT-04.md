@@ -48,14 +48,15 @@ tags:
   - name: Cart
     description: Shopping-ledger cart lifecycle events
   - name: Sync
-    description: Optional cross-device Firestore sync (currently unreachable — see Code Review companion doc, Issue #4)
+    description: Cross-device sync was originally planned via Firestore. That integration has since been fully removed from the codebase (no SDK, no sync module) — AUTH_SYNC below is documented as a dormant/reserved action, not a working feature.
 
 components:
   securitySchemes: {}
   # Chrome scopes chrome.runtime messages to the extension's own origin
-  # automatically. AUTH_SYNC is intended to be gated by Firebase
-  # Authentication, but manifest.json does not declare externally_connectable,
-  # so no external caller can reach it today.
+  # automatically. AUTH_SYNC was originally intended to be gated by Firebase
+  # Authentication, but Firebase has since been fully removed from the
+  # codebase — there is no SDK, no auth gate, and manifest.json does not
+  # declare externally_connectable, so no external caller can reach it.
 
   schemas:
 
@@ -67,7 +68,7 @@ components:
         name_hash: { type: [string, "null"] }
         retailer_product_id: { type: [string, "null"] }
         url: { type: [string, "null"] }
-        price: { type: [number, "null"], description: "Not currently sent by content.js — required to fix the Alternatives Engine's price filter (see Code Review Issue #2)" }
+        price: { type: [number, "null"], description: "Sent by content.js as prodInfo.price, extracted from the DOM at scan time. Cached into IndexedDB's price_cache store and later read back by AlternativesEngine for price-proximity filtering." }
 
     CartActionPayload:
       type: object
@@ -126,7 +127,7 @@ components:
         DR-002 (Hypertension):  "settings.hypertension && sodium > 600" # condition: "High sodium linked to high BP"; triggerQuantity: ">600mg"
         DR-003 (CVD):           "settings.cardiovascular && sat_fat > 5" # condition: "High sat fat increases LDL"; triggerQuantity: ">5g"
         DR-004 (CVD):           "settings.cardiovascular && sodium > 400 && sodium <= 600" # condition: "Moderate-high sodium impacts heart"; triggerQuantity: ">400mg"
-        DR-005 (Kidney):        "settings.kidney && potassium > 200"   # condition: "High potassium needs monitoring"; triggerQuantity: ">200mg" — NEVER FIRES: potassium is hardcoded to 0 in background.js's calcData object (see Code Review Issue #6), and the source schema has no PotassiumMG field to read it from even if fixed
+        DR-005 (Kidney):        "settings.kidney && potassium > 200"   # condition: "High potassium needs monitoring"; triggerQuantity: ">200mg" — NEVER FIRES: background.js reads potassium via `nutrition.PotassiumMG ?? nutrition.Potassium?.ValueMG`, but no PotassiumMG field exists anywhere in the source schema, so the value always resolves to `null` (not a hardcoded 0). `null > 200` is always false in JavaScript, so the rule can never fire either way
         DR-006 (Kidney):        "settings.kidney && sodium > 600"      # condition: "High sodium strains compromised kidneys"; triggerQuantity: ">600mg"
       x-requirement-divergence: >
         FR-011 specifies ONE combined cardiovascular warning firing only when
@@ -144,7 +145,7 @@ components:
         RelevanceScore: { type: string, description: "0.60*GradeRank + 0.30*CategoryMatch + 0.10*PriceProximity, formatted to 2dp — AI-001's multi-factor ranking, as designed" }
         ExplanationText: { type: string, description: "AI-002's explanation requirement" }
         PriceKES: { type: number }
-      x-status: "This array is ALWAYS empty in the shipped build — NutriScoreDB.getAllProducts() does not exist. See Code Review Issue #1 and PRD §4, FR-013."
+      x-status: "Populated end-to-end in the shipped build — NutriScoreDB.getAllProducts() exists in db.js and background.js passes its result into AlternativesEngine.getAlternatives(). PriceKES is sourced from a live price_cache populated at scan time, not from the dataset's own (still all-zero) Price.CurrentPriceKES field, so this array is empty only for a product that hasn't been scanned/cached at least once. See PRD §4, FR-013."
 
     ScoredProduct:
       type: object
@@ -176,7 +177,7 @@ components:
         alternatives:
           type: array
           items: { $ref: "#/components/schemas/AlternativeProduct" }
-          description: "Always empty in the current build — see Code Review Issue #1"
+          description: "Populated whenever the product isn't SPF-excluded and at least one qualifying same-category, same-retailer alternative exists — see the AlternativeProduct x-status note above for the price-cache caveat"
         nutritional_profile_display: { $ref: "#/components/schemas/NutrientBreakdown" }
         confidence: { type: string, description: "See System Architecture §6.3 for the gap between this value's actual vocabulary and the spec's official 7-tier hierarchy" }
         canDisplayGrade: { type: boolean }
@@ -300,11 +301,17 @@ paths:
     post:
       tags: [Sync]
       operationId: authSync
-      summary: Authenticate the current user for cross-device Firestore ledger sync
+      summary: "Reserved action name — authenticate the current user for cross-device ledger sync"
       description: >
-        Intended sender: the not-yet-built companion website. **Not reachable
-        today** — manifest.json declares no externally_connectable entry.
-        See Code Review companion doc, Issue #4.
+        Documented for completeness only. No handler for `AUTH_SYNC` exists
+        anywhere in the current source (searched `background.js`,
+        `content.js`, and every content/popup/dashboard script) — this is not
+        a "blocked" or "unreachable" endpoint so much as one that was never
+        implemented. The Firestore-backed sync it was originally scoped for
+        has since been fully removed from the codebase (System Architecture
+        doc, ADR-004), and `manifest.json` still declares no
+        `externally_connectable` entry, so even a future companion website
+        could not reach it without further work.
       x-dispatch: "chrome.runtime.sendMessage(EXTENSION_ID, { type: 'AUTH_SYNC', user })"
       requestBody:
         required: true
@@ -317,7 +324,7 @@ paths:
                 user: { type: object, properties: { id: { type: string }, email: { type: string } } }
       responses:
         "200":
-          description: "{ status: 'OK' } — unreachable in practice"
+          description: "{ status: 'OK' } — hypothetical; no handler exists to produce this response today"
 ```
 
 ---
@@ -327,4 +334,5 @@ paths:
 - **`servers`** — omitted: there is no network transport.
 - **`securitySchemes`** — omitted: Chrome enforces message-origin isolation natively.
 - **Any OFacts-related action** — omitted: FR-002 as written describes calling this API; the shipped build does not (System Architecture, ADR-005).
+- **Any Firestore-backed sync action beyond the reserved `AUTH_SYNC` name** — omitted: Firebase/Firestore has been fully removed from the codebase (System Architecture, ADR-004); no other sync-related message action was ever built.
 - **Admin scoring-rule endpoints** — removed: there is no configurable scoring-rule service; FSA-NPS thresholds are hardcoded constants.

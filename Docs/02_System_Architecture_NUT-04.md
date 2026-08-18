@@ -36,9 +36,9 @@
 
 | Stakeholder | Concern |
 |---|---|
-| Engineering | Maintainability of two parallel build toolchains; avoiding scoring-logic drift across `engine/score-engine.js` and `db.js`; reconciling NFR-004's Preact mandate with the shipped React stack |
-| Security | No deployed Firestore rules while a live Firebase config ships in the public bundle; `innerHTML` usage contradicts NFR-006/SEC-002 |
-| Product | Time-to-market for the Alternatives Engine (FR-013, currently non-functional) and the companion website |
+| Engineering | Maintainability of two parallel build toolchains; avoiding scoring-logic drift across `engine/score-engine.js` and `db.js`; reconciling NFR-004's Preact mandate with the shipped React stack; `build.cjs` still references a deleted `firebase-sync.js` entry point and will fail if invoked |
+| Security | `innerHTML` usage contradicts NFR-006/SEC-002. Firebase/Firestore has since been fully removed from the shipped build — no SDK, no API key, no live sync — so the prior "live Firebase config ships in the public bundle" exposure no longer applies |
+| Product | Time-to-market for the companion website; the Alternatives Engine (FR-013) is now functional end-to-end but its price-proximity filter depends on a live scan-time cache rather than the (still all-zero) static dataset price field |
 | Data Governance | The flexible database design in Requirements Spec §10.5 is specified but only partially realised in the production datasets (see §6 below) |
 | Operations | No CI, no automated tests, no telemetry — all verification is manual today |
 
@@ -50,9 +50,9 @@ This document provides Context, Container, Component, Data, and Deployment views
 | ADR ID | Title | Status | Notes |
 |---|---|---|---|
 | ADR-001 | Client-side-only architecture (no backend server) | Accepted | — |
-| ADR-002 | IndexedDB (via bundled `idb`) for local persistence, not `chrome.storage` | Accepted | `storage` permission still requested unused — see Code Review companion doc, Issue #8 |
+| ADR-002 | IndexedDB (via bundled `idb`) for local persistence, not `chrome.storage` | Accepted | `manifest.json`'s `permissions` array is now empty — the unused `storage` permission flagged in earlier reviews has since been removed |
 | ADR-003 | Shadow DOM for badge/flyout isolation from host-page CSS | Accepted | — |
-| ADR-004 | Firebase/Firestore for optional cross-device ledger sync | Proposed / Partially Implemented | Blocked by `externally_connectable` gap and undeployed Firestore rules — see Code Review Issues #4, #7 |
+| ADR-004 | Firebase/Firestore for optional cross-device ledger sync | **Reverted — removed from the codebase** | No `firebase-sync.js` source, no Firebase reference in `manifest.json`, `background.js`, or any content script. The only remnant is a dead entry-point reference in `build.cjs`, which will fail to build if invoked. The `externally_connectable` gap and undeployed Firestore rules are moot now that there is no sync code to reach |
 | **ADR-005** | **Offline-first, dataset-primary product lookup — no live nutrition API call** | **Accepted (de facto), not yet formally ratified against FR-002** | Requirements Spec §9.1 FR-002 specifies an Open Food Facts API call with local fallback. The shipped `background.js` contains no live API call anywhere; every lookup resolves against the bundled canonical dataset via `NutriScoreDB.resolveProductMatch()`. Given EV-003 (OFacts returns no match for major Kenyan brands) and EV-SCI-012 (database coverage is the primary AINR quality bottleneck), this is a defensible pivot, but the requirements spec should be formally updated to reflect it rather than leaving FR-002 as a contradicted "Must" requirement. |
 | **ADR-006** | **UI toolchain: React + Vite, not Preact** | **Unreconciled conflict** | NFR-004 states "Preact (not React) is mandated... No Tailwind CSS framework," citing a deliberate Phase-3 bundle-size decision. Direct inspection of the shipped `popup.html`/`dashboard.html` bundles confirms a Vite + React build. One of the two must change: either NFR-004 is amended, or the UI is migrated to Preact. Flagged for explicit resolution rather than silent continuation. |
 
@@ -62,7 +62,7 @@ This document provides Context, Container, Component, Data, and Deployment views
 
 ### 3.1 System Boundary
 **Inside the boundary:** the Chrome Manifest V3 extension — background service worker, per-retailer content scripts, popup, options-page dashboard, and the local IndexedDB store.
-**Outside the boundary:** the Naivas and Carrefour Kenya web front-ends, the offline Python dataset-curation pipeline, and the optional Firebase/Firestore project. **Not present as a boundary member despite being named in FR-002:** Open Food Facts — see ADR-005.
+**Outside the boundary:** the Naivas and Carrefour Kenya web front-ends, and the offline Python dataset-curation pipeline. **Not present as boundary members despite being named in the requirements spec:** Open Food Facts (see ADR-005) and Firebase/Firestore (see ADR-004 — fully removed, not merely external/optional).
 
 ### 3.2 External Actors & Systems
 
@@ -73,7 +73,7 @@ This document provides Context, Container, Component, Data, and Deployment views
 | Naivas Online | External System | Magento 2 + Livewire storefront |
 | Carrefour Kenya | External System | Next.js + SAP Commerce Cloud storefront |
 | Open Food Facts | Referenced in requirements (FR-002) but **not an active dependency** of the shipped build — see ADR-005 | — |
-| Firebase / Firestore | External System (optional) | Receives a full ledger mirror when `AUTH_SYNC` is received — currently unreachable in practice |
+| Firebase / Firestore | Referenced in requirements and in the original ADR-004 proposal, but **removed from the codebase** — no SDK, no sync module, no live dependency | — |
 
 ---
 
@@ -84,10 +84,10 @@ This document provides Context, Container, Component, Data, and Deployment views
 | Background Service Worker (`background.js`) | Orchestrates FoodClassifier → ScoreEngine → DiseaseEngine → AlternativesEngine; message routing; IndexedDB init | Vanilla JS, MV3 service worker | Spec names this `background.ts` with an OFacts API call responsibility — see ADR-005 |
 | Content Scripts (`content.js`) | `MutationObserver`-driven scan loop, cart-event capture, message relay | Vanilla JS | Spec names this `content-script.ts`; behavior matches FR-001 |
 | Retailer Adapters (`adapters/naivas.js`, `adapters/carrefour.js`) | Shared adapter contract: `detectProducts`, `extractCartState`, `injectBadge`, etc. | Vanilla JS | Matches NFR-005's adapter-pattern requirement |
+| Grade/Colour Constants (`adapters/grade-colors.js`) | Shared A–E grade → colour/label lookup table, loaded before `shared-ui.js` in both retailer content-script bundles | Vanilla JS | Not present in any prior revision of this document — confirmed via direct `manifest.json` inspection |
 | Shared UI Renderer (`adapters/shared-ui.js`) | Shadow-DOM badge + flyout rendering | Vanilla JS | Spec's `widget.tsx` is described as Preact; see ADR-006. Uses `innerHTML`, contradicting NFR-006 |
 | Core Engine Modules (`engine/*.js`) | Scoring/classification/disease/alternatives logic | Vanilla JS via `importScripts` | Spec names these `score-engine.ts`, `food-classifier.ts`, `disease-engine.ts`, `alternatives-engine.ts` — same responsibilities, different file extension (no TypeScript in the shipped build) |
-| IndexedDB Data Layer (`db.js`) | Schema management (v7), CRUD, product matching, cart ledger, dashboard analytics | Vanilla JS wrapping bundled `idb` | See §6 for full data-governance reconciliation |
-| Firebase Sync Module (`firebase-sync.js` → `firebase-sync.bundle.js`) | Optional Firestore mirror | Firebase JS SDK, esbuild | — |
+| IndexedDB Data Layer (`db.js`) | Schema management (**v8**, adds a `price_cache` store over v7), CRUD, product matching, cart ledger, dashboard analytics | Vanilla JS wrapping bundled `idb` | See §6 for full data-governance reconciliation |
 | Popup UI (`popup.html`) | Toolbar-icon quick view | Vite + **React** | Contradicts NFR-004's Preact mandate — ADR-006 |
 | Dashboard UI (`dashboard.html`) | Full analytics dashboard | Vite + **React** | Same — ADR-006 |
 | Static Datasets (`data/*.json`) | Canonical Naivas/Carrefour/KFCT nutrition data | Static JSON, ~9,274 combined records | See §6 |
@@ -103,7 +103,7 @@ This document provides Context, Container, Component, Data, and Deployment views
 | `FoodClassifier` | SPF-exclusion gate; keyword/regex FSA category detection | FR-006, FR-007 |
 | `ScoreEngine` | FSA-NPS 2023 N/P-points calculator, A–E grade | FR-003 (see PRD §4 for verified fidelity gaps: fibre scale, missing sweetener penalty) |
 | `DiseaseEngine` | DR-001–DR-006 clinical threshold evaluation | FR-005, FR-009–FR-012 (see PRD §4 for the confirmed combined-warning divergence on FR-011/FR-012) |
-| `AlternativesEngine` | Same-category, price-filtered ranking | FR-013, AI-001, AI-002 — **non-functional as wired, see §6.8 and Code Review companion doc Issues #1–#2** |
+| `AlternativesEngine` | Same-category, price-filtered ranking | FR-013, AI-001, AI-002 — **functional end-to-end.** `background.js` calls `NutriScoreDB.getAllProducts()` and passes the full same-retailer candidate list in; price-proximity filtering runs against the live `price_cache` rather than the static (all-zero) dataset price field — see §6.8 |
 | `NutriScoreDB` facade | IndexedDB CRUD, product matching, cart ledger, analytics | Underlies DATA-001 through DATA-006, §10.5 |
 
 ### 5.2 Content Script / Adapter — Components
@@ -146,8 +146,9 @@ CanonicalGroceryProduct {
     EnergyKJ, EnergyKcal, SugarsG, SaturatedFatG, FatG,
     CarbohydratesG, FibreG, ProteinG, SodiumMG, SaltG: number
     FVL: { Percentage: number, Basis: string, Confidence: string }
-    // ⚠ No PotassiumMG field — blocks DR-005 kidney rule regardless of
-    // the background.js hardcoded-zero bug noted in the PRD and Code Review doc
+    // ⚠ No PotassiumMG field — blocks DR-005 kidney rule regardless;
+    // background.js reads a field that's always undefined here, so the
+    // value resolves to null (not a hardcoded 0) — see §9.1/ADR reconciliation
   }
   NutritionProvenance: {
     // §10.5.3 requires 7 fields; only 5 exist here, and only EvidenceType
@@ -183,7 +184,7 @@ CanonicalGroceryProduct {
 | Layer | Spec Definition | Actual Build Status |
 |---|---|---|
 | 1. Governance (requirements spec) | Authoritative standard | This document + the requirements spec jointly serve this role |
-| 2. KFCT 2018 (immutable reference) | Extended, never edited in place | Ships as `data/KFCT2018_reference_validated.json` but **fails to import** in the current build (filename case mismatch — see Code Review Issue #5); the reference layer exists on disk but is non-functional at runtime |
+| 2. KFCT 2018 (immutable reference) | Extended, never edited in place | Ships as `data/kfct2018_reference_validated.json`; `db.js` imports it from that exact lowercase path — the two match exactly, so it **imports and functions correctly** in the current build. No filename case mismatch exists |
 | 3. Curated nutrition reference DB | KFCT + FAO/USDA/M&W + manufacturer labels | Partially realised via per-record `NutritionProvenance`, but no separate, queryable reference layer independent of the retailer records was found |
 | 4. Retailer product databases | Consume the reference layer | ✅ `naivas_final.json` / `carrefour_final.json` |
 | 5. FSA-NPS scoring engine | — | ✅ `engine/score-engine.js` |
@@ -234,7 +235,7 @@ No `IsEligibleForScoring` or `ExclusionReason` field exists anywhere in the sche
 Unchanged from v1.0: `ScoreResult`, `ClassifyResult`, `DiseaseResult`, `AlternativesResult`, `InterpretationResult` — see the API Reference document for the full field-level contract.
 
 ### 6.10 Object-Store Relationships
-Unchanged from v1.0: IndexedDB `nut04-nutriscore` v7, stores `carrefourProducts`, `naivasProducts`, `kfctReference`, `product_cache`, `shopping_ledger`, `dataset_metadata`, `user_settings`. No formal ERD — object stores are independent and joined at query time.
+Updated from v1.0: IndexedDB `nut04-nutriscore` is now at schema **v8** (was v7). Stores: `carrefourProducts`, `naivasProducts`, `kfctReference`, `product_cache`, `shopping_ledger`, `dataset_metadata`, `user_settings`, and the new `price_cache` (added at v8) — a keyless store written by `NutriScoreDB.savePrice()` from live DOM-scraped prices and read back by `getAllProducts()` to give `AlternativesEngine` real price data despite the static dataset's `Price.CurrentPriceKES` field being `0` throughout. No formal ERD — object stores are independent and joined at query time.
 
 ---
 
@@ -256,8 +257,8 @@ Unchanged from v1.0 of this document.
 |---|---|---|
 | DATA-002 | Explicit consent modal before any shopping history is stored, stating local-only storage | ⬜ Not independently verified — depends on the compiled React dashboard's internal logic, outside this review's direct-source-inspection scope |
 | DATA-003 | Single-click "Delete all my data," completing <1s | 🟡 `NutriScoreDB.purgeAll()` exists in `db.js` as the underlying mechanism; whether it is exposed as a single-click UI affordance in the shipped dashboard was not independently verified |
-| DATA-004 | No PII/history/health-flag transmission to any external server; only product-name strings to OFacts | 🟡 Consistent with the shipped build **in spirit** — since ADR-005 means no OFacts calls happen at all, there is no product-name transmission either. Firebase sync, when reachable, does transmit the full ledger — this is a different data flow than DATA-004 anticipated and should be assessed against it directly once sync is functional |
-| SEC-001 | HTTPS/TLS 1.2+ only, `connect-src` restricted to `world.openfoodfacts.org` | 🟡 No OFacts calls exist to restrict (ADR-005); CSP configuration for the actual external origins in use (Firestore) not independently audited |
+| DATA-004 | No PII/history/health-flag transmission to any external server; only product-name strings to OFacts | ✅ Consistent with the shipped build. Since ADR-005 means no OFacts calls happen at all, there is no product-name transmission; since ADR-004's Firebase sync has been fully removed (not merely unreachable), there is no ledger transmission either. No external network call of any kind exists in `background.js` today |
+| SEC-001 | HTTPS/TLS 1.2+ only, `connect-src` restricted to `world.openfoodfacts.org` | ✅ No OFacts calls exist to restrict (ADR-005) and no Firestore calls exist either (ADR-004, removed) — the extension makes no outbound network requests at all in the current build, so there is no external origin left to audit |
 | SEC-002 | No `eval()`, no `innerHTML`, CSS-custom-properties-only colours, strict CSP | ❌ **Contradicted** — `shared-ui.js` uses `innerHTML` (escaped) — see §4/§6, ADR discussion, and Code Review Issue references |
 | SEC-003 | Health-condition toggles stored as local boolean flags only, never transmitted | ✅ Consistent with `user_settings` IndexedDB store design |
 | SEC-004 | Privacy Policy published before Web Store submission | ❌ Not found in the reviewed build |
@@ -266,7 +267,7 @@ Unchanged from v1.0 of this document.
 ---
 
 ## 10. Security Architecture
-Unchanged from v1.0 for encryption/authentication sections; see §9.1 above for the SEC-00x reconciliation and §4/§6 for the NFR-006/SEC-002 `innerHTML` finding, which is the single most concrete security-relevant gap identified against the requirements spec.
+Updated from v1.0: the encryption/authentication sections describing Firebase Authentication and Firestore rules no longer apply — that integration has been fully removed (ADR-004). See §9.1 above for the SEC-00x reconciliation and §4/§6 for the NFR-006/SEC-002 `innerHTML` finding, which is now the single most concrete security-relevant gap identified against the requirements spec.
 
 ---
 
@@ -279,9 +280,51 @@ Unchanged from v1.0 for encryption/authentication sections; see §9.1 above for 
 | FR-003 | `ScoreEngine` | 🟡 Partial, see §5.1/PRD §4 |
 | FR-005/009/010 | `DiseaseEngine` | ✅ |
 | FR-011/012 | `DiseaseEngine` | 🟡 Diverged (independent vs. combined warnings) |
-| FR-013/AI-001/AI-002 | `AlternativesEngine` | ❌ Non-functional |
+| FR-013/AI-001/AI-002 | `AlternativesEngine` | ✅ Functional end-to-end (price-proximity depends on live `price_cache`, not the static dataset field) |
 | DATA-001 | — | Superseded by §10.5 — see §6 |
 | §10.5 (all subsections) | `db.js`, canonical datasets | 🟡 Partially realised — see §6.2–6.8 |
+
+---
+
+## 12. Dashboard Analytics & Visualization Pipeline (v1.2)
+
+### 12.1 Category Insights Pipeline
+
+The category insights chart processes ledger entries to show KES spend proportionally split by Nutri-Score grade.
+
+```mermaid
+flowchart TD
+    A[ShoppingLedgerRow] -->|db.ts filter| B(Valid Entries)
+    B -->|Exclude price <= 0| C{Has Price?}
+    B -->|Exclude UNKNOWN| D{Has Valid Grade?}
+    C & D --> E[categoryData useMemo]
+    E -->|Map to StackedHBar| F[Chart Segment Rendering]
+    F --> G[Dashboard UI]
+```
+
+**Key Data Logic:**
+- **Null Exclusion**: Items without scraped prices are completely excluded from the KES spend totals, preventing chart distortion.
+- **Grade Segmentation**: Categories map distinct grades (A–E) into segments on a continuous horizontal axis.
+- **Item Context**: Bar labels present the category name and valid item count (e.g. "Dairy (12)") to distinguish volume vs. total spend.
+
+### 12.2 Nutrient Trends Pipeline
+
+Nutrient trends normalise absolute mass (mg/g) against FDA Daily Values to render a unified `% DV` timeline.
+
+```mermaid
+flowchart LR
+    A[Raw Nutrient Mass] -->|/ 2300mg| B(Sodium % DV)
+    A -->|/ 50g| C(Sugar % DV)
+    A -->|/ 20g| D(SatFat % DV)
+    B & C & D --> E[TrendPoint Object]
+    E --> F[Fritsch-Carlson Interpolation]
+    F --> G[SVG Monotone Curve]
+```
+
+**Key Implementations:**
+- **OR-Gate Accumulation**: Bucketing logic triggers if *any* nutrient data is present (`hasAny = sugar !== null || sodium !== null || satFat !== null`), avoiding missing buckets from partial records.
+- **Monotone Interpolation**: Smooth cubic Hermite (Fritsch-Carlson) interpolation guarantees smooth curves that never mathematically overshoot the raw data values.
+- **Gap Bridging**: Empty chronological buckets are rendered as flat interpolations to the next real data point, avoiding artificial plunges to 0% DV.
 
 ---
 

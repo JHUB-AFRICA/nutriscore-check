@@ -19,7 +19,23 @@ NUT-04 | JHUB Africa AfyaVentures | June 2026
 | Primary Source of Truth | NutriScore\_Requirements\_v2\_Evidence\_Linked (NUT-04, June 2026) |
 | Student Lead | Kibet -- B.Sc. Electronic & Computer Engineering, JKUAT, Year 3 |
 | Programme | JHUB Africa AfyaVentures 2026 |
-| Document Status | Approved -- Architecture Baseline v1.0 |
+| Document Status | Approved -- Architecture Baseline v1.0 (historical design intent — see reconciliation note below) |
+
+# **Current Implementation Status (reconciliation note, added August 2026)**
+
+This document is the **original architecture baseline**, written in June 2026 before implementation began. Read it as a record of design intent, not as a description of the shipped extension. `02_System_Architecture_NUT-04.md` (v1.1) is the current, authoritative reconciliation of spec vs. shipped code; where the two disagree, that document and the running source in `github.com/Fivezerone/NUTRISCORE` govern. The load-bearing divergences, confirmed by direct inspection of `src/extension`:
+
+| Baseline design (this document) | Current shipped reality |
+| --- | --- |
+| `OpenFoodFactsAPI` is the primary nutrition source; `KenyanFallbackDatabase` is the fallback | No live network call exists anywhere in `background.js`. Every lookup resolves against the bundled canonical datasets (`naivas_final.json`, `carrefour_final.json`) via `NutriScoreDB.resolveProductMatch()`. `KenyanFallbackDatabase` / `fallback-db.json` was never built — superseded by the layered, provenance-carrying dataset design in Requirements Spec §10.5 |
+| `IndexedDBCache` stores exactly 7 `NutritionalProfile` fields (DATA-001), 7-day TTL | The shipped schema is a nested, multi-field `CanonicalGroceryProduct` record (Identity/Classification/Packaging/Nutrition/NutritionProvenance/Validation/Price), not a flat 7-field cache. IndexedDB is at schema **v8** with 8 object stores; cached results persist until explicitly purged, not on a 7-day TTL |
+| `UIWidget` is built in Preact (`widget.tsx`) | Popup and dashboard are Vite + **React** (`popup.tsx`, `dashboard.tsx`); the badge/flyout itself is vanilla JS (`adapters/shared-ui.js`), not Preact — an unreconciled conflict with NFR-004 |
+| Message contract: `SCORE_REQUEST` / `SCORE_RESPONSE` / `ALTERNATIVES_REQUEST` / `ALTERNATIVES_RESPONSE` | The real `chrome.runtime` action names are `CHECK_PRODUCT_SCORE`, `LOG_CART_ADD`, `SYNC_CART_STATE`, `REMOVE_CART_ITEM`, `CART_CLEARED`, `ORDER_PLACED` — none of this baseline's message names exist in the shipped source |
+| `AlternativesEngine` invoked only for D/E-scored products, returns ranked alternatives | Now functional end-to-end and matches this baseline's ranking intent (grade → category → price), but runs for **any** non-excluded product, not only D/E grades. `NutriScoreDB.getAllProducts()` exists and supplies real candidates; price-proximity uses a live scan-time cache, not a static field |
+| Firebase/Firestore is not part of this baseline at all | An optional Firebase/Firestore sync layer was added after this baseline, then **fully removed**. No trace remains except a dead `firebase-sync.js` reference in `build.cjs` |
+| — (not present in this baseline) | `adapters/grade-colors.js` — a small shared grade→colour/label module added later, loaded ahead of `shared-ui.js` in both retailer content-script bundles |
+
+The Mermaid diagram in §9 has been redrawn to show the **current shipped architecture**. The PlantUML source in §8 and the component/interface tables in §3–§7 are left as **historical baseline documentation** of original design intent and are not updated line-by-line here — cross-reference the table above and the System Architecture document for current status on any specific component.
 
 # **1. Purpose and Scope**
 
@@ -53,18 +69,18 @@ This document uses UML 2.5.1 Component Diagram notation. The following conventio
 
 The NutriScore Checkout Tool comprises eleven architectural components organised into three layers. The following table provides a one-line functional summary of each component before the detailed interface specification in Section 4.
 
-| **Component** | **Layer** | **Module / File** | **Functional Summary** |
-| --- | --- | --- | --- |
-| UIWidget | Client / Frontend | widget.tsx (Preact) | Renders the NutritionalScore badge (LetterGrade A-E), NOVAProcessingLevel tag, HealthWarning panels, and AlternativeRecommendation drawer in the browser via Shadow DOM. The only component visible to the Consumer. |
-| ContentScript | Client / Frontend | content-script.ts | Injected into supported retailer pages (Naivas, Carrefour Kenya). Uses a MutationObserver (300ms debounce) to detect GroceryProduct DOM elements asynchronously. Bridges UIWidget and BackgroundServiceWorker via chrome.runtime messaging. |
-| BackgroundServiceWorker | Client / Frontend | background.ts | Extension lifecycle manager and central router. Implements cache-first strategy (IndexedDBCache lookup before API call), request deduplication (GroceryProductID hash), and dispatches NutritionalProfile to all four engines. |
-| ScoreEngine | Core Logic | score-engine.ts | Implements the 2023 FSA-NPS algorithm across all five FSAProductCategories. Receives NutritionalProfile + FSAProductCategoryCode from FoodClassifier. Outputs NutritionalScore (LetterGrade, NumericScore, AlgorithmVersion="FSA-NPS-2023"). |
-| FoodClassifier | Core Logic | food-classifier.ts | Assigns FSAProductCategoryCode (GENERAL\_FOOD, RED\_MEAT, CHEESE, ADDED\_FAT, BEVERAGE) to each GroceryProduct. Applies the SPF exclusion gate (baby food, sports nutrition, supplements). Outputs FSAProductCategory and NOVAProcessingLevel. |
-| DiseaseEngine | Core Logic | disease-engine.ts | Evaluates NutritionalProfile against active DiseaseRules (DR-001 to DR-006). Generates HealthWarning objects when thresholds are exceeded. Injects AI-003 disclaimer into every HealthWarning. |
-| AlternativesEngine | Core Logic | alternatives-engine.ts | Produces ranked AlternativeRecommendation objects for D/E-scored GroceryProducts. Applies three-factor ranking: LetterGrade rank, FSAProductCategory match (mandatory), price proximity +/-30%. |
-| IndexedDBCache | Data & Integration | idb wrapper | Local browser key-value store. Caches NutritionalProfile (7 fields; 7-day TTL), NutritionalScore, and ShoppingHistory. Stores UserProfile.HealthConditionToggles. Never transmits data externally (DATA-004). |
-| KenyanFallbackDatabase | Data & Integration | fallback-db.json (bundled) | Bundled JSON dataset of 200+ Kenyan-market GroceryProducts with NutritionalProfile. Queried when OpenFoodFactsAPI returns no match for a product name. All 7 required NutritionalProfile fields present; FibreG estimated where unavailable. |
-| OpenFoodFactsAPI | Data & Integration | External HTTPS API | Open Food Facts REST API v2 (world.openfoodfacts.org). Queried by product name (HTTPS only; no user identifier in request). Primary nutrition data source for internationally recognised products. CC BY-SA 4.0 licence. |
+| **Component** | **Layer** | **Module / File** | **Functional Summary** | **Current Build (Aug 2026)** |
+| --- | --- | --- | --- | --- |
+| UIWidget | Client / Frontend | widget.tsx (Preact) | Renders the NutritionalScore badge (LetterGrade A-E), NOVAProcessingLevel tag, HealthWarning panels, and AlternativeRecommendation drawer in the browser via Shadow DOM. The only component visible to the Consumer. | Split across `adapters/shared-ui.js` (Shadow DOM badge/flyout, vanilla JS — not Preact) and **React** `popup.tsx` / `dashboard.tsx` |
+| ContentScript | Client / Frontend | content-script.ts | Injected into supported retailer pages (Naivas, Carrefour Kenya). Uses a MutationObserver (300ms debounce) to detect GroceryProduct DOM elements asynchronously. Bridges UIWidget and BackgroundServiceWorker via chrome.runtime messaging. | Shipped as `content.js` (vanilla JS, not TypeScript); behaviour matches this baseline's intent |
+| BackgroundServiceWorker | Client / Frontend | background.ts | Extension lifecycle manager and central router. Implements cache-first strategy (IndexedDBCache lookup before API call), request deduplication (GroceryProductID hash), and dispatches NutritionalProfile to all four engines. | Shipped as `background.js`. Cache-first lookup is accurate — but there is no API to fall back to; no live network call exists anywhere in the source |
+| ScoreEngine | Core Logic | score-engine.ts | Implements the 2023 FSA-NPS algorithm across all five FSAProductCategories. Receives NutritionalProfile + FSAProductCategoryCode from FoodClassifier. Outputs NutritionalScore (LetterGrade, NumericScore, AlgorithmVersion="FSA-NPS-2023"). | Shipped as `engine/score-engine.js` (vanilla JS); functional, same responsibility |
+| FoodClassifier | Core Logic | food-classifier.ts | Assigns FSAProductCategoryCode (GENERAL\_FOOD, RED\_MEAT, CHEESE, ADDED\_FAT, BEVERAGE) to each GroceryProduct. Applies the SPF exclusion gate (baby food, sports nutrition, supplements). Outputs FSAProductCategory and NOVAProcessingLevel. | Shipped as `engine/food-classifier.js`; functional, matches this baseline's exclusion-gate intent |
+| DiseaseEngine | Core Logic | disease-engine.ts | Evaluates NutritionalProfile against active DiseaseRules (DR-001 to DR-006). Generates HealthWarning objects when thresholds are exceeded. Injects AI-003 disclaimer into every HealthWarning. | Shipped as `engine/disease-engine.js`; functional, though the cardiovascular/kidney rules fire as independent single-nutrient warnings rather than this baseline's combined AND-condition |
+| AlternativesEngine | Core Logic | alternatives-engine.ts | Produces ranked AlternativeRecommendation objects for D/E-scored GroceryProducts. Applies three-factor ranking: LetterGrade rank, FSAProductCategory match (mandatory), price proximity +/-30%. | Shipped as `engine/alternatives-engine.js`. Functional end-to-end; runs for any non-excluded product, not only D/E grades |
+| IndexedDBCache | Data & Integration | idb wrapper | Local browser key-value store. Caches NutritionalProfile (7 fields; 7-day TTL), NutritionalScore, and ShoppingHistory. Stores UserProfile.HealthConditionToggles. Never transmits data externally (DATA-004). | Shipped as `db.js`, schema **v8**, 8 object stores. Records are nested multi-field `CanonicalGroceryProduct` objects, not a flat 7-field cache; no TTL — cached results persist until explicitly purged |
+| KenyanFallbackDatabase | Data & Integration | fallback-db.json (bundled) | Bundled JSON dataset of 200+ Kenyan-market GroceryProducts with NutritionalProfile. Queried when OpenFoodFactsAPI returns no match for a product name. All 7 required NutritionalProfile fields present; FibreG estimated where unavailable. | **Not built.** No `fallback-db.json` exists — superseded by the layered dataset design in Requirements Spec §10.5 |
+| OpenFoodFactsAPI | Data & Integration | External HTTPS API | Open Food Facts REST API v2 (world.openfoodfacts.org). Queried by product name (HTTPS only; no user identifier in request). Primary nutrition data source for internationally recognised products. CC BY-SA 4.0 licence. | **Not integrated.** No network call to Open Food Facts, or anywhere else, exists in the shipped build |
 
 # **4. Provided and Required Interface Specification**
 
@@ -356,19 +372,142 @@ The following eight canonical data entities flow between components across assem
 
 # **8. PlantUML Source Code**
 
-The following PlantUML code renders the Component Diagram in any PlantUML-compatible tool (plantuml.com, VS Code PlantUML extension, IntelliJ IDEA, or any local PlantUML installation). Copy and paste the complete block.
+The following PlantUML code renders the **original v1.0 baseline** component diagram (design intent, not current status — see the reconciliation note near the top of this document) in any PlantUML-compatible tool (plantuml.com, VS Code PlantUML extension, IntelliJ IDEA, or a local PlantUML install). GitHub does not render PlantUML natively — paste this block into a PlantUML renderer, not into a GitHub preview. It is reproduced here as a properly fenced code block (the prior revision embedded it inside a single-cell Markdown table, which most Markdown renderers, including GitHub's, do not expand into a readable code block).
 
-|  |
-| --- |
-| @startuml NutriScore\_Component\_Diagram  skinparam componentStyle rectangle  skinparam ArrowColor #5B21B6  skinparam ArrowFontColor #374151  skinparam ArrowFontSize 11  skinparam PackageBorderColor #9CA3AF  skinparam PackageBorderThickness 1  skinparam PackageFontStyle italic  skinparam ComponentBackgroundColor #FFFFFF  skinparam ComponentBorderColor #D1D5DB  skinparam ComponentBorderThickness 1  skinparam defaultFontName Arial  skinparam defaultFontSize 12  ' ── DATA ENTITIES (stereotyped components) ──────────────  component GroceryProduct <<entity>> as GP  component NutritionalProfile <<entity>> as NP  component NutritionalScore <<entity>> as NS  component FSAProductCategory <<entity>> as FPC  component NOVAProcessingLevel <<entity>> as NOVA  component DiseaseRule <<entity>> as DR  component HealthWarning <<entity>> as HW  component AlternativeRecommendation <<entity>> as AR  ' ── LAYER 1: CLIENT / FRONTEND EXTENSION ────────────────  package "Client / Frontend Extension Layer" #EDE9FE {  component [UIWidget] as UIW {  port UserInteractionPort  port ConsentPort  }  component [ContentScript] as CS {  port ProductDetectionPort  port WidgetRenderPort  }  component [BackgroundServiceWorker] as BSW {  port RoutingPort  port CacheManagementPort  port AlternativesRoutingPort  }  UIW -right-> CS : trigger / events [AC-003]  CS -down-> BSW : SCORE\_REQUEST [AC-001]  BSW .up.> CS : SCORE\_RESPONSE [AC-002]  }  ' ── LAYER 2: CORE LOGIC ENGINES ─────────────────────────  package "Core Logic Layer" #D6EEEE {  component [ScoreEngine] as SE {  port ScoringPort  }  component [FoodClassifier] as FC {  port ClassificationPort  }  component [DiseaseEngine] as DE {  port DiseaseEvaluationPort  }  component [AlternativesEngine] as AE {  port AlternativesPort  }  }  ' ── LAYER 3: DATA & INTEGRATION ─────────────────────────  package "Data & Integration Layer" #FEF3C7 {  component [IndexedDBCache] as IDB {  port CacheReadWritePort  port HistoryWritePort  port UserProfilePort  }  component [KenyanFallbackDatabase] as KFB {  port FallbackLookupPort  }  component [OpenFoodFactsAPI] as OFA {  port NutritionLookupPort  }  }  ' ── ASSEMBLY CONNECTORS ──────────────────────────────────  BSW -down-> FC : classify(NP, ProductName) [AC-007]  FC .up.> BSW : FSAProductCategory, IsExcluded [AC-008]  BSW -down-> SE : score(NP, FSAProductCategory) [AC-009]  SE .up.> BSW : NutritionalScore [AC-010]  BSW -down-> DE : evaluate(NP, Toggles) [AC-011]  DE .up.> BSW : []HealthWarning [AC-012]  BSW -down-> AE : findAlternatives(GroceryProductID, FPC, Price) [AC-013]  AE .up.> BSW : []AlternativeRecommendation [AC-014]  BSW <-right-> IDB : cache read/write [AC-004, AC-015, AC-016]  BSW .right.> OFA : GET /api/v2/search [AC-005]  BSW .right.> KFB : fallback.get(ProductName) [AC-006]  ' ── ENTITY ASSOCIATIONS (dashed) ────────────────────────  GP ..> NP : has  NP ..> NS : scored into  NP ..> FPC : classified by FoodClassifier  NP ..> NOVA : tagged by FoodClassifier  DR ..> HW : triggers (if threshold exceeded)  NS ..> AR : ranked against (D/E grade triggers alternatives)  @enduml |
+```plantuml
+@startuml NutriScore_Component_Diagram
+skinparam componentStyle rectangle
+skinparam ArrowColor #5B21B6
+skinparam ArrowFontColor #374151
+skinparam ArrowFontSize 11
+skinparam PackageBorderColor #9CA3AF
+skinparam PackageBorderThickness 1
+skinparam PackageFontStyle italic
+skinparam ComponentBackgroundColor #FFFFFF
+skinparam ComponentBorderColor #D1D5DB
+skinparam ComponentBorderThickness 1
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
 
-# **9. Mermaid.js Source Code**
+' ── DATA ENTITIES (stereotyped components) ──────────────
+component GroceryProduct <<entity>> as GP
+component NutritionalProfile <<entity>> as NP
+component NutritionalScore <<entity>> as NS
+component FSAProductCategory <<entity>> as FPC
+component NOVAProcessingLevel <<entity>> as NOVA
+component DiseaseRule <<entity>> as DR
+component HealthWarning <<entity>> as HW
+component AlternativeRecommendation <<entity>> as AR
 
-The following Mermaid.js flowchart graph provides a compatible alternative for tools such as GitHub Markdown, GitLab, Confluence, and Notion. It approximates the UML component diagram using directional subgraph groupings.
+' ── LAYER 1: CLIENT / FRONTEND EXTENSION ────────────────
+package "Client / Frontend Extension Layer" #EDE9FE {
+  component [UIWidget] as UIW {
+    port UserInteractionPort
+    port ConsentPort
+  }
+  component [ContentScript] as CS {
+    port ProductDetectionPort
+    port WidgetRenderPort
+  }
+  component [BackgroundServiceWorker] as BSW {
+    port RoutingPort
+    port CacheManagementPort
+    port AlternativesRoutingPort
+  }
+  UIW -right-> CS : trigger / events [AC-003]
+  CS -down-> BSW : SCORE_REQUEST [AC-001]
+  BSW .up.> CS : SCORE_RESPONSE [AC-002]
+}
 
-|  |
-| --- |
-| ```mermaid  flowchart TD  %% ─── Data entities (top-level) ───────────────────────  GP[GroceryProduct]:::entity  NP[NutritionalProfile]:::entity  NS[NutritionalScore]:::entity  FPC[FSAProductCategory]:::entity  NOVA[NOVAProcessingLevel]:::entity  DR[DiseaseRule]:::entity  HW[HealthWarning]:::entity  AR[AlternativeRecommendation]:::entity  %% ─── Layer 1: Client / Frontend Extension ────────────  subgraph FE["Client / Frontend Extension Layer"]  direction LR  UIW["UIWidget"]:::frontend  CS["ContentScript"]:::frontend  BSW["BackgroundServiceWorker"]:::frontend  end  %% ─── Layer 2: Core Logic Engines ─────────────────────  subgraph CL["Core Logic Layer"]  direction LR  SE["ScoreEngine"]:::engine  FC["FoodClassifier"]:::engine  DE["DiseaseEngine"]:::engine  AE["AlternativesEngine"]:::engine  end  %% ─── Layer 3: Data & Integration ─────────────────────  subgraph DI["Data & Integration Layer"]  direction LR  IDB["IndexedDBCache"]:::data  KFB["KenyanFallbackDatabase"]:::data  OFA["OpenFoodFactsAPI"]:::data  end  %% ─── Assembly Connectors ──────────────────────────────  UIW -- "trigger [AC-003]" --> CS  CS -- "SCORE\_REQUEST [AC-001]" --> BSW  BSW -. "SCORE\_RESPONSE [AC-002]" .-> CS  BSW -- "classify [AC-007]" --> FC  FC -. "FSAProductCategory [AC-008]" .-> BSW  BSW -- "score [AC-009]" --> SE  SE -. "NutritionalScore [AC-010]" .-> BSW  BSW -- "evaluate [AC-011]" --> DE  DE -. "[]HealthWarning [AC-012]" .-> BSW  BSW -- "alternatives [AC-013]" --> AE  AE -. "[]AlternativeRec [AC-014]" .-> BSW  BSW <-- "cache r/w [AC-004,AC-015,AC-016]" --> IDB  BSW -. "GET /api/v2/search [AC-005]" .-> OFA  BSW -. "fallback lookup [AC-006]" .-> KFB  %% ─── Entity flows ─────────────────────────────────────  GP -.-> NP  NP -.-> NS  NP -.-> FPC  NP -.-> NOVA  DR -.-> HW  NS -.-> AR  %% ─── Styles ──────────────────────────────────────────  classDef frontend fill:#EDE9FE,stroke:#5B21B6,color:#26215C  classDef engine fill:#D6EEEE,stroke:#006B6B,color:#04342C  classDef data fill:#FEF3C7,stroke:#B45309,color:#412402  classDef entity fill:#F2F4F7,stroke:#D1D5DB,color:#374151  ``` |
+' ── LAYER 2: CORE LOGIC ENGINES ─────────────────────────
+package "Core Logic Layer" #D6EEEE {
+  component [ScoreEngine] as SE { port ScoringPort }
+  component [FoodClassifier] as FC { port ClassificationPort }
+  component [DiseaseEngine] as DE { port DiseaseEvaluationPort }
+  component [AlternativesEngine] as AE { port AlternativesPort }
+}
+
+' ── LAYER 3: DATA & INTEGRATION ─────────────────────────
+package "Data & Integration Layer" #FEF3C7 {
+  component [IndexedDBCache] as IDB {
+    port CacheReadWritePort
+    port HistoryWritePort
+    port UserProfilePort
+  }
+  component [KenyanFallbackDatabase] as KFB { port FallbackLookupPort }
+  component [OpenFoodFactsAPI] as OFA { port NutritionLookupPort }
+}
+
+' ── ASSEMBLY CONNECTORS ──────────────────────────────────
+BSW -down-> FC  : classify(NP, ProductName) [AC-007]
+FC  .up.> BSW   : FSAProductCategory, IsExcluded [AC-008]
+BSW -down-> SE  : score(NP, FSAProductCategory) [AC-009]
+SE  .up.> BSW   : NutritionalScore [AC-010]
+BSW -down-> DE  : evaluate(NP, Toggles) [AC-011]
+DE  .up.> BSW   : []HealthWarning [AC-012]
+BSW -down-> AE  : findAlternatives(GroceryProductID, FPC, Price) [AC-013]
+AE  .up.> BSW   : []AlternativeRecommendation [AC-014]
+BSW <-right-> IDB : cache read/write [AC-004, AC-015, AC-016]
+BSW .right.> OFA  : GET /api/v2/search [AC-005]
+BSW .right.> KFB  : fallback.get(ProductName) [AC-006]
+
+' ── ENTITY ASSOCIATIONS (dashed) ────────────────────────
+GP ..> NP  : has
+NP ..> NS  : scored into
+NP ..> FPC : classified by FoodClassifier
+NP ..> NOVA: tagged by FoodClassifier
+DR ..> HW  : triggers (if threshold exceeded)
+NS ..> AR  : ranked against (D/E grade triggers alternatives)
+@enduml
+```
+
+# **9. Mermaid.js Source Code — Current Shipped Architecture**
+
+The block below replaces the prior revision's Mermaid source. Two problems with the prior version are fixed here: first, it was embedded inside a single-cell Markdown table, which GitHub (and most Markdown renderers) does not expand into an interactive diagram — it rendered as flat text. Second, its content mirrored the June 2026 baseline (`OpenFoodFactsAPI`, `KenyanFallbackDatabase`, `SCORE_REQUEST`/`SCORE_RESPONSE`), none of which exists in the shipped build. This version is a standalone fenced code block (renders natively on GitHub, GitLab, and Notion) showing the **current** architecture: real component names, real message-action names, no dead nodes for integrations that were never built or have since been removed.
+
+```mermaid
+flowchart TD
+    subgraph FE["Client / Frontend Extension"]
+        direction LR
+        ADAPT["Retailer Adapter<br/>naivas.js / carrefour.js"]:::frontend
+        CS["ContentScript<br/>content.js"]:::frontend
+        UI["Shared UI Renderer<br/>grade-colors.js + shared-ui.js<br/>+ React popup.tsx / dashboard.tsx"]:::frontend
+    end
+
+    subgraph SW["Background Service Worker"]
+        direction LR
+        ORCH["Orchestrator<br/>background.js"]:::frontend
+    end
+
+    subgraph CL["Core Logic Layer"]
+        direction LR
+        FC["FoodClassifier"]:::engine
+        SE["ScoreEngine"]:::engine
+        DE["DiseaseEngine"]:::engine
+        AE["AlternativesEngine"]:::engine
+    end
+
+    subgraph DI["Data Layer"]
+        direction LR
+        IDB[("IndexedDB v8<br/>via db.js")]:::data
+    end
+
+    ADAPT --> CS
+    CS --> UI
+    CS <-->|"CHECK_PRODUCT_SCORE ⇄ result"| ORCH
+    ORCH --> FC
+    FC --> SE
+    FC --> DE
+    SE --> AE
+    ORCH <-->|"read / write"| IDB
+    AE -.->|"read candidates + live prices"| IDB
+
+    classDef frontend fill:#EDE9FE,stroke:#5B21B6,color:#26215C
+    classDef engine fill:#D6EEEE,stroke:#006B6B,color:#04342C
+    classDef data fill:#FEF3C7,stroke:#B45309,color:#412402
+```
+
+**What changed vs. the baseline diagram in §8:** no `OpenFoodFactsAPI` or `KenyanFallbackDatabase` nodes (neither exists — every lookup resolves against the bundled dataset, ADR-005); no Firebase/Firestore node (added after this baseline, then fully removed, ADR-004); message labels use the real action names (`CHECK_PRODUCT_SCORE`, not `SCORE_REQUEST`/`SCORE_RESPONSE`); `AlternativesEngine` shows its real second read from `IndexedDB` for candidates and live cached prices, which no version of the UML/PlantUML diagram captured; `grade-colors.js` is included as a real shipped file.
 
 # **10. Architecture-to-Requirements Traceability**
 
@@ -414,4 +553,4 @@ The IRetailerAdapter interface defines a contract for retailer-specific DOM scra
 
 |  |
 | --- |
-| **\* Architecture baseline declaration:** This Component Diagram constitutes the Architecture Baseline v1.0 for NutriScore Checkout Tool (NUT-04). All implementation in Phase 7 (Prototype Development) must conform to the component boundaries, interface contracts, and connector protocols defined in this document. Any deviation that changes an interface signature or crosses a component boundary requires a formal Architecture Change Request (ACR) reviewed at the next Project Plan gate. |
+| **\* Architecture baseline declaration (historical):** This Component Diagram constituted the Architecture Baseline v1.0 for NutriScore Checkout Tool (NUT-04) at the start of implementation (June 2026). It no longer describes the shipped system as-is — see the reconciliation note near the top of this document and `02_System_Architecture_NUT-04.md` for current, verified status. Treat the component boundaries and interface contracts below as the original design rationale, useful for understanding *why* the system was shaped this way, not as a conformance target for new work. Architecture Change Requests should be evaluated against the current System Architecture document, not against this baseline. |
