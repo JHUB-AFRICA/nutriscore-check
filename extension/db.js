@@ -448,7 +448,7 @@ var NutriScoreDB = (() => {
     for (const row of allInCart) {
       if (row.retailer !== retailer) continue;
       if (row.status !== "in_cart") continue;
-      const cartMatch = cartItems.find((c) => c.productId === row.productId);
+      const cartMatch = cartItems.find((c) => String(c.productId) === String(row.productId));
       if (cartMatch) {
         let changed = false;
         if (row.quantity !== cartMatch.quantity) {
@@ -462,12 +462,14 @@ var NutriScoreDB = (() => {
         if (changed) {
           await store.put(row);
         }
-        processedPayloadIds.add(cartMatch.productId);
+        processedPayloadIds.add(String(cartMatch.productId));
+      } else {
+        await store.delete(row.id);
       }
     }
     await tx.done;
     for (const item of cartItems) {
-      if (processedPayloadIds.has(item.productId)) continue;
+      if (processedPayloadIds.has(String(item.productId))) continue;
       const matchResult = await resolveProductMatch(
         retailer,
         item.productId,

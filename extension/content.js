@@ -167,7 +167,7 @@ class NutriScoreContentEngine {
   async syncCart(fetchApi = false) {
     if (!this.adapter) return;
     
-    let cartItems = [];
+    let cartItems = null;
     // 1. Extract from DOM (Sidebar/flyout if open)
     if (this.adapter.extractCartState) {
       cartItems = this.adapter.extractCartState();
@@ -178,15 +178,17 @@ class NutriScoreContentEngine {
       const apiItems = await this.adapter.fetchCartFromAPI();
       // Merge, giving preference to DOM items (what the user actually sees)
       const itemMap = new Map();
-      cartItems.forEach(i => itemMap.set(i.productId, i));
+      (cartItems || []).forEach(i => itemMap.set(String(i.productId), i));
       apiItems.forEach(i => {
         // Only add if not already extracted from DOM
-        if (!itemMap.has(i.productId)) {
-           itemMap.set(i.productId, i);
+        if (!itemMap.has(String(i.productId))) {
+           itemMap.set(String(i.productId), i);
         }
       });
       cartItems = Array.from(itemMap.values());
     }
+
+    if (cartItems === null) return;
     
     // 3. Detect cart cleared: had items before, now empty
     // Only detect cart cleared if we are actually checking the API, or if we know the cart DOM is visible.

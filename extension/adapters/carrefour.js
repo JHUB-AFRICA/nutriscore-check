@@ -105,6 +105,30 @@ const CarrefourAdapter = {
     return products;
   },
 
+  extractCartState() {
+    if (!this.isCartPage()) return null;
+
+    return this.detectProducts()
+      .filter(product => product.id)
+      .map(product => {
+        const quantityEl = product.domElement.querySelector(
+          "input[name*='qty' i], input[type='number'], [data-quantity], [data-qty]"
+        );
+        const rawQuantity = quantityEl?.value
+          || quantityEl?.getAttribute("data-quantity")
+          || quantityEl?.getAttribute("data-qty")
+          || "1";
+        const quantity = Math.max(1, parseInt(rawQuantity, 10) || 1);
+
+        return {
+          productId: String(product.id),
+          product_name: product.name,
+          quantity,
+          priceSnapshot: product.price || null
+        };
+      });
+  },
+
   // Climbs up from a detected product element to find the actual
   // full-width row/card container. detectProducts() sometimes matches
   // a narrower inner wrapper (e.g. just the image+name column) rather

@@ -116,8 +116,6 @@ const NaivasAdapter = {
     const items = [...cartWrapper.children].filter(el => el.tagName === "DIV");
 
     items.forEach(card => {
-      if (card.querySelector(".nutriscore-isolated-root")) return;
-
       const linkEl = card.querySelector('a[wire\\:click*="redirectToProductPage"]');
       let id = null;
       if (linkEl) {
@@ -148,6 +146,31 @@ const NaivasAdapter = {
     });
 
     return products;
+  },
+
+  extractCartState() {
+    const cartWrapper = this._onCartUrl()
+      ? document.querySelector(".bg-naivas-gray-light.rounded-xl.flex.flex-col.gap-4")
+      : null;
+    if (!cartWrapper) return null;
+
+    return this.detectCartItems(cartWrapper).map(product => {
+      const quantityEl = product.domElement.querySelector(
+        "input[name*='qty' i], input[type='number'], [data-quantity], [data-qty]"
+      );
+      const rawQuantity = quantityEl?.value
+        || quantityEl?.getAttribute("data-quantity")
+        || quantityEl?.getAttribute("data-qty")
+        || "1";
+      const quantity = Math.max(1, parseInt(rawQuantity, 10) || 1);
+
+      return {
+        productId: String(product.id),
+        product_name: product.name,
+        quantity,
+        priceSnapshot: product.price || null
+      };
+    });
   },
 
   // Climbs up from a detected product element to find the actual
