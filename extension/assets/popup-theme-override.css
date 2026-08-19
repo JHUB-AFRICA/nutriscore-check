@@ -1,20 +1,24 @@
-/* NutriScore popup — theme override to match the main site's green/Inter
-   look, without touching the compiled React bundle. Loaded AFTER
-   index-7ZM78C03.css so these values win the cascade. */
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+/* NutriScore popup — theme override to match the public site without
+   touching the compiled React bundle. Loaded after the compiled CSS. */
 
 :root {
-  /* Site accent green (matches webpage/site.css) instead of the default
-     near-black --primary, used for the main CTA button + avatar fallback */
-  --primary: #16a34a;
+  --primary: #1d6b45;
   --primary-foreground: #ffffff;
-
+  --background: #f5f1e8;
+  --foreground: #17251d;
+  --card: #fffdf8;
+  --card-foreground: #17251d;
+  --muted: #e9f3e5;
+  --muted-foreground: #607064;
+  --accent: #e4f1df;
+  --accent-foreground: #17251d;
+  --border: rgba(23, 37, 29, 0.14);
+  --input: rgba(23, 37, 29, 0.14);
+  --ring: #1d6b45;
   --radius: 0;
 }
 
-/* Square off the card, rows, and buttons — no rounded corners anywhere
-   except the avatar circle, which stays round on purpose. */
+/* Square off the card, rows, and buttons while keeping the avatar round. */
 #root .rounded-lg,
 #root .rounded-md,
 #root .rounded-xl {
@@ -22,15 +26,21 @@
 }
 
 html, body, #root {
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-family: 'Trebuchet MS', 'Segoe UI', sans-serif !important;
 }
 
-/* Give the whole popup card the same soft mint-to-white gradient wash and
-   border the main site uses, instead of flat white */
+body {
+  background:
+    radial-gradient(circle at 8% 4%, rgba(227, 111, 79, 0.12), transparent 24rem),
+    radial-gradient(circle at 92% 30%, rgba(29, 107, 69, 0.1), transparent 28rem),
+    var(--background) !important;
+  color: var(--foreground) !important;
+}
+
 #root > div {
-  background: linear-gradient(180deg, rgba(236, 253, 245, 0.6), #ffffff 60px) !important;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 8px 30px rgba(22, 163, 74, 0.08);
+  background: linear-gradient(180deg, rgba(228, 241, 223, 0.72), #fffdf8 72px) !important;
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 30px rgba(29, 107, 69, 0.09);
 }
 
 /* The "N" logo mark: swap the flat grade-green fill for the site's
@@ -38,17 +48,15 @@ html, body, #root {
    deeper than before — the logo+title are now wrapped in their own
    container alongside the health-details button.) */
 #root > div > div:first-child > div:first-child > div:first-child {
-  background: linear-gradient(135deg, #16a34a, #34d399) !important;
-  box-shadow: 0 8px 18px rgba(22, 163, 74, 0.22);
+  background: linear-gradient(135deg, #1d6b45, #5b9b6f) !important;
+  box-shadow: 0 8px 18px rgba(29, 107, 69, 0.22);
 }
 
-/* The two light-grey info rows (status pill + "items graded" row) — retint
-   from neutral grey to the site's soft-mint accent background */
+/* Retint the neutral information rows to the site's soft green surface. */
 .bg-\[\#f6f7f9\] {
-  background-color: #ecfdf5 !important;
+  background-color: #e9f3e5 !important;
 }
 
-/* Buttons and pills get a touch more lift on hover, matching the site */
 #root button {
   transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
 }

@@ -87,28 +87,31 @@ const NutriSharedUI = {
     const styles = `
       *{box-sizing:border-box;margin:0;padding:0}
       .badge-trigger{
-        font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+        font-family:'Trebuchet MS','Segoe UI',sans-serif;
         background:var(--ns-bg);color:var(--ns-txt);
         font-weight:800;font-size:11px;letter-spacing:.5px;
-        padding:3px 8px;border-radius:4px;
-        box-shadow:0 2px 6px rgba(0,0,0,.2);
+        padding:4px 9px;border-radius:0;
+        border:2px solid rgba(255,255,255,.78);
+        box-shadow:0 5px 12px rgba(23,37,29,.2),0 0 0 3px color-mix(in srgb,var(--ns-bg) 22%,transparent);
+        text-shadow:0 1px 1px rgba(0,0,0,.18);
         cursor:pointer;display:inline-flex;align-items:center;gap:5px;
-        transition:transform .15s;user-select:none;
+        transition:transform .18s,box-shadow .18s;user-select:none;
       }
-      .badge-trigger:hover{transform:scale(1.05)}
+      .badge-trigger:hover{transform:translateY(-2px) rotate(-1deg);box-shadow:0 8px 16px rgba(23,37,29,.24),0 0 0 4px color-mix(in srgb,var(--ns-bg) 26%,transparent)}
       .badge-grade{font-size:15px;font-weight:900}
       .flyout{
         display:none;position:absolute;top:calc(100% + 6px);left:0;
-        width:268px;background:#fff;border-radius:10px;
+        width:268px;background:#fffdf8;border-radius:0;
         box-shadow:0 10px 30px rgba(0,0,0,.18);
-        padding:14px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-        color:#222;font-size:12px;z-index:9999;
-        border:1px solid #e8e8e8;
+        padding:14px;font-family:'Trebuchet MS','Segoe UI',sans-serif;
+        color:#17251d;font-size:12px;z-index:9999;
+        border:1px solid rgba(23,37,29,.14);
       }
       .flyout.open{display:block}
       .ns-header{
-        background:var(--ns-bg);color:var(--ns-txt);
-        padding:8px 10px;border-radius:7px;margin-bottom:10px;
+        background:linear-gradient(135deg,var(--ns-bg),color-mix(in srgb,var(--ns-bg) 72%,white));color:var(--ns-txt);
+        padding:8px 10px;border-radius:0;margin-bottom:10px;
+        border-left:4px solid rgba(255,255,255,.7);
       }
       .ns-header-name{font-weight:700;font-size:13px;line-height:1.3;margin-bottom:2px;}
       .ns-header-grade{font-size:11px;opacity:.9}

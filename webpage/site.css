@@ -119,6 +119,7 @@ main {
 .nav-action:hover,
 .nav-action:focus-visible {
   background: #15803d;
+  transform: translateY(-1px);
 }
 
 .nav-avatar {
@@ -548,11 +549,12 @@ main {
   font-weight: 700;
   font-size: 0.95rem;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
 
 .save-btn:hover {
   background-color: #15803d;
+  transform: translateY(-1px);
 }
 
 .save-btn:active {
@@ -731,7 +733,7 @@ section li {
 .product-sample,
 .overlay-sample {
   border-radius: 22px;
-  background: var(--surface-soft);
+  background: linear-gradient(180deg, rgba(236, 253, 245, 0.6), #ffffff 60px);
   border: 1px solid rgba(15, 23, 42, 0.08);
   padding: 22px;
 }
@@ -774,7 +776,7 @@ section li {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: 0;
   min-width: 48px;
   min-height: 48px;
   font-weight: 800;
@@ -782,6 +784,17 @@ section li {
   font-size: 1rem;
   padding: 0 14px;
   background-color: #16a34a;
+  border: 2px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 8px 18px rgba(23, 37, 29, 0.16), 0 0 0 4px rgba(29, 107, 69, 0.1);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.18);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.nutri-badge:hover,
+.nutri-pill:hover,
+.overlay-grade:hover {
+  transform: translateY(-2px) rotate(-1deg);
+  box-shadow: 0 12px 22px rgba(23, 37, 29, 0.2), 0 0 0 5px rgba(29, 107, 69, 0.14);
 }
 
 .badge-row {
@@ -798,13 +811,15 @@ section li {
   place-items: center;
   background: rgba(22, 163, 74, 0.1);
   color: var(--accent);
+  border-color: rgba(29, 107, 69, 0.2);
+  text-shadow: none;
 }
 
-.badge-a { background: #16a34a; color: #ffffff; }
-.badge-b { background: #65a30d; color: #ffffff; }
-.badge-c { background: #f59e0b; color: #ffffff; }
-.badge-d { background: #f97316; color: #ffffff; }
-.badge-e { background: #ef4444; color: #ffffff; }
+.badge-a { background: linear-gradient(135deg, #16a34a, #3fbd68); color: #ffffff; box-shadow: 0 8px 18px rgba(22, 163, 74, 0.24), 0 0 0 4px rgba(22, 163, 74, 0.12); }
+.badge-b { background: linear-gradient(135deg, #65a30d, #8fbd35); color: #ffffff; box-shadow: 0 8px 18px rgba(101, 163, 13, 0.24), 0 0 0 4px rgba(101, 163, 13, 0.12); }
+.badge-c { background: linear-gradient(135deg, #f59e0b, #f8c24c); color: #17251d; text-shadow: none; box-shadow: 0 8px 18px rgba(245, 158, 11, 0.24), 0 0 0 4px rgba(245, 158, 11, 0.12); }
+.badge-d { background: linear-gradient(135deg, #f97316, #fb9a54); color: #ffffff; box-shadow: 0 8px 18px rgba(249, 115, 22, 0.24), 0 0 0 4px rgba(249, 115, 22, 0.12); }
+.badge-e { background: linear-gradient(135deg, #ef4444, #f47777); color: #ffffff; box-shadow: 0 8px 18px rgba(239, 68, 68, 0.24), 0 0 0 4px rgba(239, 68, 68, 0.12); }
 
 .overlay-grade {
   font-size: 1rem;
@@ -849,6 +864,63 @@ section li {
   background: linear-gradient(90deg, rgba(22, 163, 74, 0.9), rgba(74, 222, 128, 0.9));
 }
 
+/* Dashboard example section (#dashboard) — two chart cards showing the
+   same shape of data as the extension's own dashboard.html: a basket
+   quality donut and a nutrient trends line chart. Built on the same
+   soft-green card treatment as .product-sample / .overlay-sample so it
+   reads as part of the same page, not a bolted-on widget. */
+.dashboard-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.chart-card {
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(236, 253, 245, 0.6), #ffffff 60px);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 22px;
+}
+
+.chart-card h3 {
+  margin: 0 0 4px;
+  font-size: 1.15rem;
+}
+
+.chart-subtitle {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.chart-wrap {
+  position: relative;
+  height: 200px;
+}
+
+.chart-wrap--donut {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 16px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.chart-legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+}
+
 .feature-card i {
   display: inline-flex;
   width: 42px;
@@ -880,7 +952,7 @@ section li {
   padding: 18px 20px 18px 58px;
   border-radius: 18px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  background: var(--surface-soft);
+  background: linear-gradient(180deg, rgba(236, 253, 245, 0.6), #ffffff 60px);
 }
 
 .install-steps li::before {
@@ -918,7 +990,7 @@ section li {
   border-radius: 16px;
   padding: 16px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  background: var(--surface-soft);
+  background: linear-gradient(180deg, rgba(236, 253, 245, 0.6), #ffffff 60px);
   color: var(--text);
   font-weight: 700;
 }
@@ -941,7 +1013,7 @@ section li {
   padding: 18px 20px;
   border-radius: 18px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  background: var(--surface-soft);
+  background: linear-gradient(180deg, rgba(236, 253, 245, 0.6), #ffffff 60px);
   margin-bottom: 14px;
 }
 
@@ -959,6 +1031,70 @@ section li {
   margin: 0;
   color: var(--muted);
   line-height: 1.65;
+}
+
+/* Team section (#team) — supervisor / contributor cards. Same soft-green
+   card language as .feature-card, with an initials avatar like the nav's
+   .nav-avatar but square, per the crisp-edge rule below. */
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.team-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(22, 163, 74, 0.12);
+  background: var(--accent-soft);
+}
+
+.team-avatar {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: rgba(22, 163, 74, 0.18);
+  color: var(--accent);
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
+.team-card h3 {
+  margin: 0 0 2px;
+  font-size: 1.05rem;
+}
+
+.team-role {
+  margin: 0;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.team-affiliation {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+/* Supervisor card gets a slightly stronger border + solid avatar fill so
+   it reads as distinct from the student dev-team cards below it, without
+   introducing a new color. */
+.team-card-supervisor {
+  border: 1px solid rgba(22, 163, 74, 0.35);
+  background: rgba(22, 163, 74, 0.1);
+}
+
+.team-card-supervisor .team-avatar {
+  background: var(--accent);
+  color: #ffffff;
 }
 
 .appreciate-box {
@@ -1054,6 +1190,49 @@ code {
   font-size: 0.95em;
 }
 
+/* --- Square / crisp override (matches extension/popup.html's look) ---
+   popup-theme-override.css zeroes every corner in the popup except the
+   round avatar photo. Mirrored here: every card, button, pill, and badge
+   goes square-edged; only .nav-avatar (an actual photo) stays circular. */
+.logo-mark,
+.logo-badge,
+.nav-action,
+.nav-section a,
+.spotlight-card,
+.card-tag,
+.cta-button,
+.cta-button--secondary,
+.health-panel,
+.health-panel input[type="number"],
+.health-panel select,
+.health-panel textarea,
+.chip-group .chip,
+.save-btn,
+section,
+.product-sample,
+.overlay-sample,
+.chart-card,
+.nutri-badge,
+.nutri-pill,
+.overlay-grade,
+.feature-card,
+.feature-card i,
+.plan-card,
+.plan-card-tag,
+.install-steps li,
+.install-steps li::before,
+.stores-grid li,
+.stores-grid i,
+.faq-item,
+.team-card,
+.team-card-supervisor,
+.team-avatar,
+.appreciate-box,
+.appreciate-box i,
+code {
+  border-radius: 0 !important;
+}
+
 @media (max-width: 900px) {
   .page-wrapper {
     grid-template-columns: 1fr;
@@ -1123,4 +1302,294 @@ code {
   .spotlight-card {
     padding: 20px;
   }
+}
+
+:root {
+  --bg: #f5f1e8;
+  --surface: #fffdf8;
+  --surface-soft: #e9f3e5;
+  --accent: #1d6b45;
+  --accent-soft: #e4f1df;
+  --text: #17251d;
+  --muted: #607064;
+  --border: rgba(23, 37, 29, 0.14);
+  --shadow: 0 18px 45px rgba(31, 55, 39, 0.09);
+  --coral: #e36f4f;
+  --sun: #f3b84b;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+  background:
+    radial-gradient(circle at 8% 4%, rgba(227, 111, 79, 0.12), transparent 24rem),
+    radial-gradient(circle at 92% 30%, rgba(29, 107, 69, 0.1), transparent 28rem),
+    var(--bg);
+  color: var(--text);
+}
+
+.site-nav {
+  background: rgba(255, 253, 248, 0.92);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-inner {
+  max-width: 1180px;
+  padding: 16px 28px;
+}
+
+.nav-logo {
+  color: var(--text);
+  letter-spacing: 0;
+}
+
+.logo-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--accent);
+  box-shadow: 4px 4px 0 var(--sun);
+}
+
+.logo-badge {
+  border-radius: 4px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.nav-action,
+.cta-button,
+.save-btn {
+  border-radius: 6px;
+  background: var(--accent);
+  box-shadow: 3px 3px 0 rgba(227, 111, 79, 0.45);
+}
+
+.nav-action:hover,
+.nav-action:focus-visible,
+.save-btn:hover,
+.cta-button:hover {
+  background: #155638;
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0 rgba(227, 111, 79, 0.45);
+}
+
+.site-header {
+  min-height: 430px;
+  padding: clamp(56px, 9vw, 112px) max(28px, calc((100% - 1124px) / 2));
+  background-image:
+    linear-gradient(90deg, rgba(245, 241, 232, 0.98) 0%, rgba(245, 241, 232, 0.9) 45%, rgba(245, 241, 232, 0.25) 100%),
+    url('assets/header-groceries.jpg');
+  border-bottom: 1px solid var(--border);
+}
+
+.header-label,
+.sample-label,
+.section-label {
+  color: var(--coral);
+}
+
+.site-header h1 {
+  max-width: 700px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(2.7rem, 6vw, 5.3rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 0.98;
+}
+
+.header-subtitle {
+  max-width: 560px;
+  color: #405247;
+  font-weight: 600;
+}
+
+.page-wrapper {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.sidebar {
+  padding: 42px 20px 42px 0;
+  border-right: 1px solid var(--border);
+  background: transparent;
+}
+
+.nav-section h4 {
+  color: var(--coral);
+}
+
+.nav-section a {
+  border-radius: 4px;
+  color: var(--muted);
+}
+
+.nav-section a:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.main-content {
+  padding: 42px 0 42px 42px;
+}
+
+section {
+  border-radius: 8px;
+  border-color: var(--border);
+  background: rgba(255, 253, 248, 0.9);
+  box-shadow: var(--shadow);
+  padding: clamp(24px, 4vw, 42px);
+}
+
+section h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(1.7rem, 3vw, 2.35rem);
+  color: var(--accent);
+}
+
+section p,
+section li {
+  color: #405247;
+}
+
+.feature-card,
+.plan-card,
+.team-card,
+.chart-card,
+.install-steps li,
+.stores-grid li,
+.faq-item,
+.product-sample,
+.overlay-sample {
+  border-radius: 6px;
+  border-color: rgba(29, 107, 69, 0.18);
+  background: #f9f7ef;
+}
+
+.feature-card:hover,
+.spotlight-card:hover {
+  transform: translateY(-4px) rotate(-0.3deg);
+}
+
+.feature-card i,
+.stores-grid i,
+.team-avatar,
+.appreciate-box i {
+  border-radius: 6px;
+  background: #dcebd5;
+  color: var(--accent);
+}
+
+.feature-card i {
+  color: var(--coral);
+}
+
+.plan-card-premium,
+.team-card-supervisor {
+  border-color: rgba(227, 111, 79, 0.45);
+  background: #fff0e9;
+}
+
+.plan-card-tag {
+  border-radius: 4px;
+  background: var(--coral);
+}
+
+.health-panel {
+  border-radius: 8px;
+  border-color: rgba(29, 107, 69, 0.2);
+  background: #f9f7ef;
+  box-shadow: var(--shadow);
+}
+
+.cta-button--secondary {
+  border-radius: 6px;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.cta-button--secondary:hover,
+.cta-button--secondary:focus-visible {
+  background: var(--accent-soft);
+}
+
+.health-panel input[type="number"],
+.health-panel select,
+.health-panel textarea {
+  border-radius: 5px;
+  border-color: var(--border);
+  background: #fffdf8;
+  font-family: inherit;
+}
+
+.chip-group .chip {
+  border-radius: 5px;
+  border-color: var(--border);
+}
+
+.chip-group .chip:has(input:checked) {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.site-footer {
+  max-width: 1180px;
+  margin-bottom: 48px;
+}
+
+code {
+  border-radius: 4px;
+  background: #e7eee2;
+  color: var(--accent);
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    padding: 14px 0;
+    border-right: none;
+  }
+
+  .main-content {
+    padding: 28px 0;
+  }
+}
+
+@media (max-width: 700px) {
+  .nav-inner {
+    padding: 14px 18px;
+  }
+
+  .site-header {
+    min-height: 360px;
+    padding: 56px 18px 42px;
+    background-position: 68% 55%;
+  }
+
+  .site-header h1 {
+    font-size: clamp(2.45rem, 13vw, 3.8rem);
+  }
+
+  .main-content {
+    padding: 18px 0 28px;
+  }
+
+  section {
+    padding: 24px 20px;
+  }
+}
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+}
+
+#premium {
+  order: 8;
+}
+
+#team {
+  order: 9;
 }
