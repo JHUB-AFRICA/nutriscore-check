@@ -105,6 +105,30 @@ const CarrefourAdapter = {
     return products;
   },
 
+  extractCartState() {
+    if (!this.isCartPage()) return null;
+
+    return this.detectProducts()
+      .filter(product => product.id)
+      .map(product => {
+        const quantityEl = product.domElement.querySelector(
+          "input[name*='qty' i], input[type='number'], [data-quantity], [data-qty]"
+        );
+        const rawQuantity = quantityEl?.value
+          || quantityEl?.getAttribute("data-quantity")
+          || quantityEl?.getAttribute("data-qty")
+          || "1";
+        const quantity = Math.max(1, parseInt(rawQuantity, 10) || 1);
+
+        return {
+          productId: String(product.id),
+          product_name: product.name,
+          quantity,
+          priceSnapshot: product.price || null
+        };
+      });
+  },
+
   // Climbs up from a detected product element to find the actual
   // full-width row/card container. detectProducts() sometimes matches
   // a narrower inner wrapper (e.g. just the image+name column) rather
@@ -138,14 +162,19 @@ const CarrefourAdapter = {
     card.querySelectorAll(".nutriscore-isolated-root").forEach(el => el.remove());
 
     const anchorEl = this.findRowAnchor(card);
-    if (anchorEl !== card) {
-      const currentPosition = getComputedStyle(anchorEl).position;
-      if (currentPosition === "static") anchorEl.style.position = "relative";
-    }
+    const anchorStyle = getComputedStyle(anchorEl);
+    if (anchorStyle.position === "static") anchorEl.style.position = "relative";
+    // A positioned ancestor with z-index:auto does NOT establish a new
+    // stacking context -- our badge's z-index would then be compared
+    // against the whole page (headers, sticky nav, etc.) instead of being
+    // contained within the card. Give the anchor an explicit z-index so it
+    // forms its own stacking context and the badge can never bleed above
+    // page chrome, no matter how high its internal z-index is.
+    if (anchorStyle.zIndex === "auto") anchorEl.style.zIndex = "0";
 
     const badgeContainer = document.createElement("div");
     badgeContainer.className  = "nutriscore-isolated-root";
-    badgeContainer.style.cssText = "position:absolute;top:8px;right:8px;z-index:1000;";
+    badgeContainer.style.cssText = "position:absolute;top:8px;right:8px;z-index:2;";
 
     const shadow = badgeContainer.attachShadow({ mode: "open" });
 
@@ -157,8 +186,14 @@ const CarrefourAdapter = {
       E: { bg: "#e63b2e", txt: "#ffffff", label: "Very Poor" },
     };
 
-    const grade  = (productResult.nutriscore_grade || "C").toUpperCase();
-    const info   = gradeColors[grade] || gradeColors.C;
+    const rawGrade = (productResult.nutriscore_grade || "UNKNOWN").toUpperCase();
+    // A product with no score (UNKNOWN/NULL -- e.g. excluded categories or
+    // unmatched items) must never silently fall back to gradeColors.C: that
+    // renders as a real yellow "Moderate" badge, which misrepresents an
+    // unscored product as an actually-scored moderate one.
+    const isNoData = rawGrade === "UNKNOWN" || rawGrade === "NULL" || !gradeColors[rawGrade];
+    const grade = isNoData ? "—" : rawGrade;
+    const info  = isNoData ? { bg: "#e0e0e0", txt: "#555555", label: "No data" } : gradeColors[grade];
     const name   = this.escapeHTML(productResult.product_name || "");
     const prof   = productResult.nutritional_profile_display || {};
     const diseaseWarnings = productResult.diseaseWarnings || [];
@@ -216,6 +251,10 @@ const CarrefourAdapter = {
         transition:transform .15s;user-select:none;
       }
       .badge-trigger:hover{transform:scale(1.05)}
+      .badge-trigger.badge-nodata{
+        width:auto;padding:0 8px;border-radius:8px;font-size:10px;font-weight:700;
+        letter-spacing:.2px;
+      }
       .flyout{
         display:none;position:absolute;top:calc(100% + 6px);left:0;
         width:268px;background:#fff;border-radius:10px;
@@ -266,12 +305,12 @@ const CarrefourAdapter = {
     shadow.adoptedStyleSheets = [this.sharedStyleSheet];
 
     shadow.innerHTML = `
-      <div class="badge-trigger" style="--ns-bg: ${info.bg}; --ns-txt: ${info.txt};" title="NutriScore ${grade} — ${info.label}">${grade}</div>
+      <div class="badge-trigger${isNoData ? ' badge-nodata' : ''}" style="--ns-bg: ${info.bg}; --ns-txt: ${info.txt};" title="NutriScore ${isNoData ? 'No data' : grade + ' — ' + info.label}">${isNoData ? 'No data' : grade}</div>
       <div class="flyout">
         <button class="ns-close" style="display:none"></button>
         <div class="ns-header" style="--ns-bg: ${info.bg}; --ns-txt: ${info.txt};">
           <div class="ns-header-name">${name}</div>
-          <div class="ns-header-grade">NutriScore ${grade} — ${info.label}</div>
+          <div class="ns-header-grade">${isNoData ? 'No NutriScore data available' : 'NutriScore ' + grade + ' — ' + info.label}</div>
         </div>
         <div class="ns-section-title">Per 100g / 100ml</div>
         ${nutriRowsHTML}
@@ -283,12 +322,22 @@ const CarrefourAdapter = {
     const trigger = shadow.querySelector(".badge-trigger");
     const flyout  = shadow.querySelector(".flyout");
 
+    const restingZ = anchorEl.style.zIndex;
     trigger.addEventListener("click", e => {
       e.preventDefault(); e.stopPropagation();
+      const willOpen = !flyout.classList.contains("open");
       flyout.classList.toggle("open");
+      // See the matching comment in naivas.js -- the anchor's z-index:0
+      // keeps the badge contained under page chrome, but also means a
+      // sibling card can paint over an open flyout that spills past its
+      // own card's edge. Temporarily outrank siblings only while open.
+      anchorEl.style.zIndex = willOpen ? "30" : restingZ;
     });
     const closeBtn = shadow.querySelector(".ns-close");
-    if (closeBtn) closeBtn.addEventListener("click", () => flyout.classList.remove("open"));
+    if (closeBtn) closeBtn.addEventListener("click", () => {
+      flyout.classList.remove("open");
+      anchorEl.style.zIndex = restingZ;
+    });
 
     // Force relative positioning without reading computed style to avoid Layout Thrashing
     card.setAttribute("data-nutriscore-id", productResult.productId || "");

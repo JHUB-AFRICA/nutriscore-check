@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>NutriScore — About the Extension</title>
+  <title>NutriScore Checkout Tool</title>
   <link rel="stylesheet" href="site.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 </head>
@@ -16,10 +16,11 @@
         <span class="logo-text">NutriScore <span class="logo-badge">Extension</span></span>
       </a>
       <div class="nav-links">
-        <button type="button" id="navSignButton" class="nav-action" onclick="location.href='health.html'">Sign in</button>
+        <button type="button" id="navSignButton" class="nav-action" onclick="location.href='health.html'">Health</button>
       </div>
     </div>
   </nav>
+  <div class="freshness-strip" aria-hidden="true"></div>
 
   <header class="site-header">
     <p class="header-label">Kenyan grocery companion</p>
@@ -35,11 +36,12 @@
           <h4>Main</h4>
           <ul>
             <li><a href="#features">Features</a></li>
+            <li><a href="#dashboard">Dashboard</a></li>
             <li><a href="#install">Install</a></li>
-            <li><a href="health.html">Health</a></li>
             <li><a href="#stores">Stores</a></li>
             <li><a href="#faq">FAQ</a></li>
             <li><a href="#premium">Premium</a></li>
+            <li><a href="#team">Team</a></li>
           </ul>
         </div>
       </nav>
@@ -49,94 +51,62 @@
 
       <section id="features">
       <h2>Key features</h2>
-      <p>Everything you need to make smarter food choices while you shop — without leaving the page.</p>
+      <p>NutriScore Checkout Tool works alongside your grocery shopping, turning product data into clear guidance before you add items to your basket.</p>
       <div class="features-grid">
         <div class="feature-card">
           <i class="ti ti-certificate"></i>
-          <h3>Grade badges</h3>
-          <p>Compact A–E score badges appear on each product card as you hover.</p>
+          <h3>Live product grading</h3>
+          <p>As you browse supported Naivas and Carrefour pages, the extension detects products and places an easy-to-read A–E Nutri-Score badge on each item.</p>
         </div>
         <div class="feature-card">
           <i class="ti ti-chart-bar"></i>
-          <h3>Nutrient overlay</h3>
-          <p>Click a badge to see calories, fat, sugar, salt, fiber, and protein estimates.</p>
+          <h3>Nutrition details at a glance</h3>
+          <p>Open a product badge to see its estimated nutrients per 100g or 100ml, including energy, fat, saturated fat, sugars, fibre, protein, and sodium.</p>
         </div>
         <div class="feature-card">
-          <i class="ti ti-bolt"></i>
-          <h3>Instant scan</h3>
-          <p>Lightweight content script runs entirely in your browser — no data sent anywhere.</p>
+          <i class="ti ti-heart-rate-monitor"></i>
+          <h3>Personalized health warnings</h3>
+          <p>Save health conditions and dietary preferences to receive relevant warnings when a product may not fit your profile, with a clear health disclaimer.</p>
         </div>
         <div class="feature-card">
-          <i class="ti ti-arrows-compare"></i>
-          <h3>Compare at a glance</h3>
-          <p>Quickly compare multiple products side by side as you browse.</p>
+          <i class="ti ti-chart-donut"></i>
+          <h3>Shopping analytics, stored locally</h3>
+          <p>Confirmed cart items build a private shopping ledger for grade distribution and nutrient trend charts, while product results are cached on your device for faster repeat scans.</p>
         </div>
       </div>
     </section>
 
-    <section id="example">
-      <h2>Example product preview</h2>
-      <p>This example shows how NutriScore places a grade badge on a product card and displays a nutrient detail overlay for a single item.</p>
-      <div class="example-panel">
-        <div class="product-sample">
-          <div class="product-sample-top">
-            <div>
-              <p class="sample-label">Product card</p>
-              <h3>Naivas Fresh Spinach</h3>
-              <p class="sample-meta">Naivas • 250 g</p>
-            </div>
-            <div class="nutri-badge badge-a">A</div>
+    <section id="dashboard">
+      <h2>See your dashboard in action</h2>
+      <p>Every item you confirm at checkout feeds your dashboard — here's an example of what it tracks once you've built up some history.</p>
+      <div class="dashboard-panel">
+        <div class="chart-card">
+          <p class="sample-label">Basket quality</p>
+          <h3>Share of items by grade</h3>
+          <p class="chart-subtitle">Tap a segment for details</p>
+          <div class="chart-wrap chart-wrap--donut">
+            <canvas id="ns-donut"></canvas>
           </div>
-          <p class="sample-copy">A strong grade badge is attached to the product tile to make the score instantly visible while browsing.</p>
-          <div class="badge-row">
-            <span class="nutri-pill badge-a">A</span>
-            <span class="nutri-pill badge-b">B</span>
-            <span class="nutri-pill badge-c">C</span>
-            <span class="nutri-pill badge-d">D</span>
-            <span class="nutri-pill badge-e">E</span>
+          <div class="chart-legend">
+            <span><i style="background:#16a34a"></i>A · Best choice (0)</span>
+            <span><i style="background:#65a30d"></i>B · Good choice (1)</span>
+            <span><i style="background:#f59e0b"></i>C · Okay choice (2)</span>
+            <span><i style="background:#f97316"></i>D · Eat less often (1)</span>
+            <span><i style="background:#ef4444"></i>E · Least healthy (0)</span>
           </div>
         </div>
 
-        <div class="overlay-sample">
-          <div class="overlay-sample-header">
-            <div>
-              <p class="sample-label">Nutrient overlay</p>
-              <h3>Naivas Fresh Spinach</h3>
-            </div>
-            <div class="overlay-grade">A</div>
+        <div class="chart-card">
+          <p class="sample-label">Nutrient trends</p>
+          <h3>Average intake vs. daily limit</h3>
+          <p class="chart-subtitle">Last 14 days</p>
+          <div class="chart-wrap">
+            <canvas id="ns-trend"></canvas>
           </div>
-          <p class="sample-copy">Tap a badge to open a detail panel with estimated nutrients and a summary grade.</p>
-          <div class="nutrient-list">
-            <div class="nutrient-item">
-              <span>Calories</span>
-              <strong>22 kcal</strong>
-              <div class="nutrient-bar"><span style="width: 16%;"></span></div>
-            </div>
-            <div class="nutrient-item">
-              <span>Fat</span>
-              <strong>0.3 g</strong>
-              <div class="nutrient-bar"><span style="width: 8%;"></span></div>
-            </div>
-            <div class="nutrient-item">
-              <span>Sugar</span>
-              <strong>0.4 g</strong>
-              <div class="nutrient-bar"><span style="width: 10%;"></span></div>
-            </div>
-            <div class="nutrient-item">
-              <span>Salt</span>
-              <strong>0.02 g</strong>
-              <div class="nutrient-bar"><span style="width: 4%;"></span></div>
-            </div>
-            <div class="nutrient-item">
-              <span>Fiber</span>
-              <strong>2.8 g</strong>
-              <div class="nutrient-bar"><span style="width: 35%;"></span></div>
-            </div>
-            <div class="nutrient-item">
-              <span>Protein</span>
-              <strong>3.0 g</strong>
-              <div class="nutrient-bar"><span style="width: 30%;"></span></div>
-            </div>
+          <div class="chart-legend">
+            <span><i style="background:#f97316"></i>Sodium (mg)</span>
+            <span><i style="background:#ef4444"></i>Sugar (g)</span>
+            <span><i style="background:#16a34a"></i>Saturated fat (g)</span>
           </div>
         </div>
       </div>
@@ -159,7 +129,6 @@
       <ul class="stores-grid">
         <li><i class="ti ti-shopping-cart"></i> Naivas</li>
         <li><i class="ti ti-shopping-cart"></i> Carrefour</li>
-        <li><i class="ti ti-shopping-cart"></i> Quickmart</li>
       </ul>
       <p>Support is currently focused on Naivas; if you'd like other Kenyan online retailers supported in future, please share feedback or file a request on the project repository.</p>
     </section>
@@ -167,38 +136,84 @@
     <section id="faq">
       <h2>Frequently Asked Questions</h2>
       <div class="faq-item">
-        <h3>How does NutriScore work?</h3>
-        <p>NutriScore analyzes product details on supported shopping pages and overlays a simple grade badge that reflects estimated nutrition quality. It also shows nutrient estimates when you click a badge.</p>
+        <h3>How does NutriScore Checkout Tool work?</h3>
+        <p>While you shop, the extension detects product cards and cart items on supported retailer pages, matches them with nutrition data, and adds an A–E Nutri-Score badge. Select a badge to view the product's estimated nutrients per 100g or 100ml.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Which stores and pages are supported?</h3>
+        <p>The current adapters support Naivas and Carrefour shopping pages, including product listings and checkout or cart views. The extension watches for products added or removed from a cart so its grades and shopping history stay current.</p>
       </div>
       <div class="faq-item">
         <h3>Do I need to sign in to use it?</h3>
-        <p>No. The extension works immediately on supported pages, but signing in lets you save a health profile and receive more tailored suggestions.</p>
+        <p>No. Product grading and nutrition details work without an account. Sign in only when you want to save a health profile, sync it across the website and extension, or use personalized health guidance.</p>
       </div>
       <div class="faq-item">
-        <h3>Which stores are supported?</h3>
-        <p>NutriScore currently supports Naivas and selected Kenyan online stores. We plan to add more retailers over time, and requests are welcome.</p>
+        <h3>What does my health profile do?</h3>
+        <p>You can save conditions, allergies, and dietary preferences. The extension uses those details to add relevant product warnings alongside the nutrition breakdown, with a reminder that the guidance is not medical advice.</p>
+      </div>
+      <div class="faq-item">
+        <h3>What appears in the shopping dashboard?</h3>
+        <p>Confirmed cart items are recorded in a local shopping ledger. The dashboard can use that history to show grade distribution and nutrient trends, helping you understand the quality of your basket over time.</p>
       </div>
       <div class="faq-item">
         <h3>Is my data shared?</h3>
-        <p>No. NutriScore runs locally in your browser and does not send personal shopping data to external servers.</p>
+        <p>Product results, cached nutrition data, and shopping history stay on your device. If you sign in and save a health profile, those profile details are securely stored so the website and extension can sync them across your devices.</p>
       </div>
     </section>
 
-    <section id="thanks">
-      <h2>A word of thanks</h2>
-      <div class="appreciate-box">
-        <i class="ti ti-heart"></i>
-        <div>
-          <h3>Thank you for using NutriScore</h3>
-          <p>Every person who installs this extension is choosing to be a little more mindful about what goes into their basket. That means a lot. NutriScore is a side project built out of genuine curiosity — no analytics, no ads, no data collection. If it's helped you make even one better food choice, it's done its job. Feedback, ideas, and contributions are always welcome.</p>
+    <section id="team">
+      <h2>Team</h2>
+      <p>The people behind NutriScore.</p>
+      <div class="team-grid">
+        <div class="team-card team-card-supervisor">
+          <div class="team-avatar">LN</div>
+          <div>
+            <h3>Dr. Lawrence Nderu</h3>
+            <p class="team-role">Project Supervisor</p>
+            <p class="team-affiliation">JKUAT / JHUB Africa</p>
+          </div>
+        </div>
+        <div class="team-card">
+          <div class="team-avatar">RW</div>
+          <div>
+            <h3>Robin Wanyonyi</h3>
+            <p class="team-role">Team Lead · Frontend Developer</p>
+            <p class="team-affiliation">JKUAT</p>
+          </div>
+        </div>
+        <div class="team-card">
+          <div class="team-avatar">MA</div>
+          <div>
+            <h3>Mitchel Atieno</h3>
+            <p class="team-role">Mass Communication</p>
+            <p class="team-affiliation">JKUAT</p>
+          </div>
+        </div>
+        <div class="team-card">
+          <div class="team-avatar">SW</div>
+          <div>
+            <h3>Sheldon Wambiakale</h3>
+            <p class="team-role">Backend Developer</p>
+            <p class="team-affiliation">JKUAT</p>
+          </div>
+        </div>
+        <div class="team-card">
+          <div class="team-avatar">MN</div>
+          <div>
+            <h3>Mike Nyanyuki</h3>
+            <p class="team-role">Frontend Developer</p>
+            <p class="team-affiliation">JKUAT</p>
+          </div>
+        </div>
+        <div class="team-card">
+          <div class="team-avatar">AK</div>
+          <div>
+            <h3>Alex Kibet</h3>
+            <p class="team-role">Backend Developer</p>
+            <p class="team-affiliation">JKUAT</p>
+          </div>
         </div>
       </div>
-    </section>
-
-    <section id="contribute">
-      <h2>Contribute & Learn more</h2>
-      <p>If you'd like to help improve NutriScore or learn how it works, contributions and feedback are welcome. Open an issue to suggest new stores, report bugs, or propose enhancements. Developer notes and contribution guidelines are available in the project repository.</p>
-      <p><small>Thank you for improving the extension — every suggestion helps make shopping healthier for everyone.</small></p>
     </section>
 
     <section id="premium">
@@ -224,7 +239,7 @@
           <ul class="plan-feature-list">
             <li><i class="ti ti-check"></i> Personalized, disease-specific warnings (diabetes, hypertension, allergies, and more)</li>
             <li><i class="ti ti-check"></i> Trends dashboard — basket history and grade-distribution charts over time</li>
-            <li><i class="ti ti-check"></i> Multi-retailer support — Carrefour, Quickmart, and cross-store comparison</li>
+            <li><i class="ti ti-check"></i> Multi-retailer support — Carrefour and cross-store comparison</li>
             <li><i class="ti ti-check"></i> Smart alternatives — better-graded product swaps near what you're already buying</li>
           </ul>
         </div>
@@ -246,7 +261,7 @@
     <small>NutriScore — personalized nutrition hints while you shop.</small>
   </footer>
 
-
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script>
     const nav = document.querySelector('.site-nav');
 
@@ -279,7 +294,122 @@
         }
       }
     } catch (e) {}
+
+    // Dashboard example charts (Basket quality donut + Nutrient trends line)
+    // Static sample data — mirrors what the extension's own dashboard.html renders
+    // once the shopping ledger has confirmed cart items in it.
+    (function () {
+      const donutEl = document.getElementById('ns-donut');
+      const trendEl = document.getElementById('ns-trend');
+      if (!donutEl || !trendEl || typeof Chart === 'undefined') return;
+
+      new Chart(donutEl.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: ['A', 'B', 'C', 'D', 'E'],
+          datasets: [{
+            data: [0, 1, 2, 1, 0].map(v => v || 0.0001),
+            backgroundColor: ['#16a34a', '#65a30d', '#f59e0b', '#f97316', '#ef4444'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          cutout: '68%',
+          plugins: { legend: { display: false } },
+          animation: false
+        },
+        plugins: [{
+          id: 'ns-donut-center',
+          afterDraw(chart) {
+            const { ctx, chartArea: { left, right, top, bottom } } = chart;
+            const cx = (left + right) / 2, cy = (top + bottom) / 2;
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#0f172a';
+            ctx.font = '800 22px Inter, sans-serif';
+            ctx.fillText('4', cx, cy - 2);
+            ctx.font = '600 11px Inter, sans-serif';
+            ctx.fillStyle = '#617083';
+            ctx.fillText('total items', cx, cy + 16);
+            ctx.restore();
+          }
+        }]
+      });
+
+      // 14 days of sample history — shows the kind of week-to-week swing
+      // that shows up once someone's actually been using the extension
+      // for a while, rather than a single flat point.
+      const trendLabels = ['Aug 6', 'Aug 7', 'Aug 8', 'Aug 9', 'Aug 10', 'Aug 11', 'Aug 12', 'Aug 13', 'Aug 14', 'Aug 15', 'Aug 16', 'Aug 17', 'Aug 18', 'Aug 19'];
+      new Chart(trendEl.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: trendLabels,
+          datasets: [
+            {
+              label: 'Sodium',
+              data: [58, 64, 49, 71, 55, 40, 62, 77, 53, 46, 68, 59, 35, 22],
+              borderColor: '#f97316',
+              backgroundColor: '#f97316',
+              pointRadius: 2,
+              borderWidth: 2,
+              tension: 0.3
+            },
+            {
+              label: 'Sugar',
+              data: [30, 45, 38, 52, 41, 60, 33, 48, 65, 44, 29, 37, 24, 18],
+              borderColor: '#ef4444',
+              backgroundColor: '#ef4444',
+              pointRadius: 2,
+              borderWidth: 2,
+              tension: 0.3
+            },
+            {
+              label: 'Saturated fat',
+              data: [20, 26, 18, 33, 28, 22, 36, 24, 19, 31, 27, 21, 16, 14],
+              borderColor: '#16a34a',
+              backgroundColor: '#16a34a',
+              pointRadius: 2,
+              borderWidth: 2,
+              tension: 0.3
+            },
+            { label: 'Daily limit', data: Array(trendLabels.length).fill(100), borderColor: '#f97316', borderDash: [6, 4], borderWidth: 1, pointRadius: 0 }
+          ]
+        },
+        options: {
+          animation: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: {
+              min: 0,
+              max: 110,
+              ticks: { stepSize: 25, callback: v => v + '%', font: { size: 11 } },
+              grid: { color: 'rgba(97,112,131,0.15)' }
+            },
+            x: {
+              ticks: { font: { size: 11 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 7 },
+              grid: { display: false }
+            }
+          }
+        }
+      });
+    })();
+
+    // Scroll reveal: fade/lift each section into place as it enters the
+    // viewport. Sections are marked reveal-ready first (so there's no
+    // flash of hidden content if JS is slow to run), then observed.
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const sections = document.querySelectorAll('main section');
+      sections.forEach(s => s.classList.add('reveal-ready'));
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('reveal-visible');
+            io.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.15, rootMargin: '0px 0px -60px 0px' });
+      sections.forEach(s => io.observe(s));
+    }
   </script>
 </body>
-</html> 
- 
+</html>

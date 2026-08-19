@@ -16,57 +16,52 @@ importScripts(
 
 console.log("[NutriScore SW] Component Architecture v2.0 active.");
 
-let dataReady = false;
-async function initializeDatabases() {
-  if (dataReady) return;
-  if (typeof NutriScoreDB !== "undefined" && NutriScoreDB.importDatasets) {
-    try {
-      await NutriScoreDB.importDatasets();
-      dataReady = true;
-      console.log("[NutriScore SW] IndexedDB Datasets imported and ready.");
-    } catch (err) {
-      console.error("[NutriScore SW] Dataset import failed:", err);
-    }
-  } else {
-    console.warn("[NutriScore SW] NutriScoreDB not available.");
+self.__nutriscorePriceIndex = new Map();
+
+let initPromise = null;
+
+function initializeDatabases() {
+  if (!initPromise) {
+    initPromise = (async () => {
+      if (typeof NutriScoreDB === "undefined" || !NutriScoreDB.importDatasets) {
+        console.warn("[NutriScore SW] NutriScoreDB not available.");
+        return;
+      }
+      try {
+        await NutriScoreDB.importDatasets();
+        console.log("[NutriScore SW] IndexedDB Datasets imported and ready.");
+      } catch (err) {
+        console.error("[NutriScore SW] Dataset import failed:", err);
+        initPromise = null;
+        throw err;
+      }
+    })();
   }
+  return initPromise;
 }
 
 initializeDatabases();
 
-function resolveBadgeSignal(groceryProduct) {
-  const validation = groceryProduct.Validation || {};
-  const checks = validation.ConsistencyChecks || {};
-  const prov = groceryProduct.NutritionProvenance || {};
-
-  // All relevant checks must pass (or be not_checked, but failures are fatal)
-  const isFailed = Object.values(checks).some(v => v === "failed");
-
-  // Evidence level must be one of these trusted levels
-  const trustedLevels = ["product_specific", "international_fct", "category_reference"];
-  const isTrusted = trustedLevels.includes(prov.EvidenceLevel);
-
-  if (isFailed || !isTrusted) {
-    throw new Error("Product validation failed or evidence level insufficient.");
-  }
-
-  let confidenceMap = {
-    "product_specific": "measured",
-    "international_fct": "derived",
-    "category_reference": "fallback"
-  };
-
-  return confidenceMap[prov.EvidenceLevel] || "fallback";
-}
+// resolveBadgeSignal replaced by NutriScoreDB.interpretProduct
 
 async function getProductInfo(payload, retailerCode) {
   await initializeDatabases();
 
-  const { product_name, name_hash, retailer_product_id, url } = payload;
+  const { product_name, name_hash, retailer_product_id, url, price } = payload;
 
+  if (retailer_product_id && price) {
+    if (NutriScoreDB.savePrice) await NutriScoreDB.savePrice(retailer_product_id, price);
+  }
+  
   const settings = await (NutriScoreDB.getSettings ? NutriScoreDB.getSettings() : { diabetes: true, hypertension: true, cardiovascular: true, kidney: true });
 
-  const cacheKey = retailer_product_id || url || product_name;
+  // A url that isn't a real http(s) page link (e.g. "javascript:void(0)"
+  // picked up from an unrelated icon/button by an adapter bug) must never
+  // be used as a cache key -- it's not unique per product, and every
+  // product sharing it would collapse onto one cached result. See:
+  // Naivas wishlist-icon cacheKey collision, Aug 2026.
+  const safeUrl = url && /^https?:\/\//i.test(url) ? url : null;
+  const cacheKey = retailer_product_id || safeUrl || product_name;
   if (cacheKey && typeof NutriScoreDB !== "undefined" && NutriScoreDB.getCachedProduct) {
     const cached = await NutriScoreDB.getCachedProduct(cacheKey);
     if (cached) {
@@ -89,58 +84,82 @@ async function getProductInfo(payload, retailerCode) {
   }
 
   const groceryProduct = matchResult.product;
-  const mappedConfidence = resolveBadgeSignal(groceryProduct);
+  const interpretation = NutriScoreDB.interpretProduct(groceryProduct);
 
   const nutrition = groceryProduct.Nutrition || {};
   const classification = groceryProduct.Classification || {};
   const identity = groceryProduct.Identity || {};
 
   const parseNumeric = (val) => {
-    if (val == null) return 0;
+    if (val == null) return null;
     const parsed = parseFloat(val);
-    return isNaN(parsed) ? 0 : parsed;
+    return isNaN(parsed) ? null : parsed;
   };
 
-  const fsaCategoryCode = classification.FSACategoryCode || "GENERAL_FOOD";
-
+  let fsaCategoryCode = interpretation.nutrientAlgorithmVariant;
+  
   const calcData = {
     name:          identity.ProductName || product_name,
-    category:      fsaCategoryCode,
-    is_beverage:   fsaCategoryCode === "BEVERAGE",
+    category:      fsaCategoryCode || "GENERAL_FOOD",
+    is_beverage:   (fsaCategoryCode || "GENERAL_FOOD") === "BEVERAGE",
     is_raw_food:   false,
-    energy:        parseNumeric(nutrition.EnergyKJ),
+    energy:        parseNumeric(nutrition.EnergyKJ ?? (nutrition.EnergyKcal != null ? nutrition.EnergyKcal * 4.184 : null)),
     sugars:        parseNumeric(nutrition.SugarsG),
     sat_fat:       parseNumeric(nutrition.SaturatedFatG),
-    sodium:        parseNumeric(nutrition.Sodium?.ValueMG),
+    sodium:        parseNumeric(nutrition.SodiumMG ?? nutrition.Sodium?.ValueMG),
     fiber:         parseNumeric(nutrition.FibreG),
     protein:       parseNumeric(nutrition.ProteinG),
     fruits_veg_pct: parseNumeric(nutrition.FVL?.Percentage),
-    potassium:     0,
+    potassium:     parseNumeric(nutrition.PotassiumMG ?? nutrition.Potassium?.ValueMG),
     total_fat:     parseNumeric(nutrition.FatG),
     carbs:         parseNumeric(nutrition.CarbohydratesG),
-    nova_group:    3,
-    confidence:    mappedConfidence,
+    confidence:    interpretation.evidenceTier,
   };
 
   const classResult = FoodClassifier.classify(calcData);
-  const isExcluded = classResult.isExcluded || classResult.IsExcluded;
+  const isExcluded = classResult.isExcluded;
 
-  const scoreResult = ScoreEngine.score(calcData, fsaCategoryCode);
+  if (!fsaCategoryCode) {
+    fsaCategoryCode = classResult.FSAProductCategoryCode || "GENERAL_FOOD";
+    calcData.category = fsaCategoryCode;
+    calcData.is_beverage = fsaCategoryCode === "BEVERAGE";
+  }
+
   const diseaseResult = DiseaseEngine.evaluate(calcData, settings);
 
-  const altsResult = AlternativesEngine.getAlternatives(
-    { productId: identity.ProductID, fsaCategory: fsaCategoryCode, score: scoreResult.NumericScore },
-    []
-  );
+  let scoreResult;
+  let altsResult = { alternatives: [], disclaimer: "" };
 
-  const displayCategory = NutriScoreDB.resolveDisplayCategory(groceryProduct);
+  if (isExcluded) {
+    scoreResult = { LetterGrade: "UNKNOWN", NumericScore: null, breakdown: null, AlgorithmVersion: "FSA-NPS-2023" };
+  } else {
+    scoreResult = ScoreEngine.score(calcData, fsaCategoryCode);
+    
+    // Make sure we have the full list of products for the AlternativesEngine
+    const allProducts = (typeof NutriScoreDB !== "undefined" && NutriScoreDB.getAllProducts)
+      ? await NutriScoreDB.getAllProducts(retailerCode)
+      : [];
+
+    altsResult = AlternativesEngine.getAlternatives(
+      { 
+        productId: identity.ProductID, 
+        fsaCategory: fsaCategoryCode, 
+        score: scoreResult.NumericScore, 
+        grade: scoreResult.LetterGrade,
+        price: payload.price 
+      },
+      allProducts
+    );
+  }
+
+  const displayCategory = interpretation.foodCategory;
 
   const result = {
     productId:                   identity.ProductID || groceryProduct.GroceryProductID || payload.retailer_product_id,
     product_name:                calcData.name,
     retailer:                    retailerCode,
     nutriscore_grade:            scoreResult.LetterGrade || "UNKNOWN",
-    score:                       scoreResult.NumericScore || 0,
+    score:                       scoreResult.NumericScore ?? 0,
     score_details:               scoreResult.breakdown || {},
     fsaCategory:                 fsaCategoryCode,
     displayCategory:             displayCategory,
@@ -160,6 +179,16 @@ async function getProductInfo(payload, retailerCode) {
       sodium_mg:  nutrition.Sodium?.ValueMG,
     },
     confidence:                  calcData.confidence,
+    canDisplayGrade:             interpretation.canDisplayGrade,
+    validationStatus:            interpretation.validationStatus,
+    evidenceTier:                interpretation.evidenceTier,
+    valueSpecificity:            interpretation.valueSpecificity,
+    categoryPlausibilityCheck:   interpretation.categoryPlausibilityCheck,
+    energyConsistencyCheck:      interpretation.energyConsistencyCheck,
+    saltSodiumConsistencyCheck:  interpretation.saltSodiumConsistencyCheck,
+    dataQualityFlags:            interpretation.dataQualityFlags,
+    sourceReference:             interpretation.sourceReference,
+    packSizeUnit:                groceryProduct.Packaging?.PackSizeUnit || (interpretation.foodCategory === "BEVERAGE" ? "ml" : "g"),
     matchInfo: {
       matched: matchResult.matched,
       matchMethod: matchResult.matchMethod,
@@ -193,7 +222,7 @@ async function getProductInfo(payload, retailerCode) {
 // https://<extension-id>.chromiumapp.org/ — must be added under
 // "Authorized redirect URIs" for that client in Google Cloud Console.
 // ---------------------------------------------------------------------------
-const GOOGLE_WEB_CLIENT_ID = "923932588057-v6m40br659aabs7kaft90auc02sevjek.apps.googleusercontent.com";
+const GOOGLE_WEB_CLIENT_ID = "923932588057-3u23uanj2j5jgmi6rjdns83r3qmeogoh.apps.googleusercontent.com";
 const FIREBASE_API_KEY = "AIzaSyB05umupSWPt96qNWaevFJnS4ovaj907Gc";
 const FIREBASE_PROJECT_ID = "nutriscore-check";
 
@@ -354,9 +383,6 @@ async function refreshHealthProfile() {
   return healthProfile;
 }
 
-// ---------------------------------------------------------------------------
-// Internal messages (popup, content scripts, options/dashboard page)
-// ---------------------------------------------------------------------------
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("[NutriScore SW] Action:", message.action);
 
@@ -413,44 +439,127 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.action === "LOG_CART_EVENT") {
-    if (typeof NutriScoreDB !== "undefined" && NutriScoreDB.logCartEvent) {
-      NutriScoreDB.logCartEvent(message.payload)
-        .then(() => {
-          sendResponse({ status: "SUCCESS" });
-          // Let any open dashboard tab know there's new data, so it can
-          // refresh itself without the person needing to manually
-          // reload (the dashboard is a separate page that only reads
-          // IndexedDB once on load, so it has no other way to know).
-          chrome.runtime.sendMessage({ action: "SHOPPING_LEDGER_UPDATED" }).catch(() => {
-            // No dashboard tab currently open/listening -- fine, ignore.
-          });
-        })
-        .catch(err => sendResponse({ status: "ERROR", error: err.message }));
-    } else {
-      sendResponse({ status: "ERROR", error: "DB not initialized" });
-    }
+  if (message.action === "LOG_CART_ADD") {
+    (async () => {
+      await initializeDatabases();
+      try {
+        if (typeof NutriScoreDB === "undefined" || !NutriScoreDB.logCartEvent) {
+          throw new Error("DB not initialized");
+        }
+        
+        const item = message.payload;
+        const retailerCode = item.retailer;
+        const now = Date.now();
+        
+        const matchResult = await NutriScoreDB.resolveProductMatch(
+          retailerCode,
+          item.productId,
+          null,
+          item.product_name
+        );
+        
+        if (matchResult.matched && matchResult.product) {
+          const p = matchResult.product;
+          const name = p.Identity?.ProductName || p.GroceryProductName || p.name || item.product_name || "Unknown Product";
+          const interpretation = NutriScoreDB.interpretProduct(p);
+          if (interpretation.canDisplayGrade) {
+            const prodInfo = await getProductInfo(item, retailerCode);
+            const row = {
+              id: `${retailerCode}-${item.productId}-${now}`,
+              productId: item.productId,
+              name,
+              retailer: retailerCode,
+              addedAt: now,
+              quantity: item.quantity || 1,
+              priceSnapshot: item.priceSnapshot,
+              gradeSnapshot: prodInfo.nutriscore_grade,
+              category: NutriScoreDB.resolveDisplayCategory(p),
+              status: "in_cart",
+              nutritionSnapshot: {
+                sodiumMg: p.Nutrition?.SodiumMG ?? p.Nutrition?.Sodium?.ValueMG ?? null,
+                sugarsG: p.Nutrition?.SugarsG ?? null,
+                satFatG: p.Nutrition?.SaturatedFatG ?? null,
+                potassiumMg: p.Nutrition?.PotassiumMG ?? p.Nutrition?.Potassium?.ValueMG ?? null
+              }
+            };
+            await NutriScoreDB.logCartEvent(row);
+            chrome.runtime.sendMessage({ action: "CART_UPDATED" }).catch(() => {});
+          }
+        }
+      } catch (err) {
+        console.error("LOG_CART_ADD failed:", err);
+      }
+    })();
     return true;
   }
 
-  if (message.action === "REMOVE_CART_EVENT") {
-    if (typeof NutriScoreDB !== "undefined" && NutriScoreDB.removeCartEventsByProductId) {
-      NutriScoreDB.removeCartEventsByProductId(message.payload && message.payload.productId)
-        .then((removedCount) => {
-          sendResponse({ status: "SUCCESS", removedCount });
-          if (removedCount > 0) {
-            // Same reasoning as the LOG_CART_EVENT broadcast above -- let
-            // any open dashboard tab know the ledger changed so it can
-            // reflect the removal without a manual reload.
-            chrome.runtime.sendMessage({ action: "SHOPPING_LEDGER_UPDATED" }).catch(() => {
-              // No dashboard tab currently open/listening -- fine, ignore.
-            });
-          }
-        })
-        .catch(err => sendResponse({ status: "ERROR", error: err.message }));
-    } else {
-      sendResponse({ status: "ERROR", error: "DB not initialized" });
-    }
+  if (message.action === "SYNC_CART_STATE") {
+    (async () => {
+      await initializeDatabases();
+      try {
+        if (typeof NutriScoreDB === "undefined" || !NutriScoreDB.syncCart) {
+          throw new Error("DB not initialized or syncCart missing");
+        }
+        
+        await NutriScoreDB.syncCart(message.payload.retailer, message.payload.items);
+        chrome.runtime.sendMessage({ action: "CART_UPDATED" }).catch(() => {});
+        if (sendResponse) sendResponse({ status: "SUCCESS" });
+      } catch (err) {
+        console.error("Cart sync failed:", err);
+        if (sendResponse) sendResponse({ status: "ERROR", error: err.message });
+      }
+    })();
+    return true;
+  }
+
+  if (message.action === "REMOVE_CART_ITEM") {
+    (async () => {
+      await initializeDatabases();
+      try {
+        const { retailer, productId } = message.payload;
+        console.log(`[NutriScore SW] Removing cart item ${productId} for ${retailer}`);
+        if (NutriScoreDB.removeCartItem) {
+          await NutriScoreDB.removeCartItem(retailer, productId);
+        }
+        chrome.runtime.sendMessage({ action: "CART_UPDATED" }).catch(() => {});
+      } catch (err) {
+        console.error("REMOVE_CART_ITEM failed:", err);
+      }
+    })();
+    return true;
+  }
+
+  if (message.action === "CART_CLEARED") {
+    (async () => {
+      await initializeDatabases();
+      try {
+        const retailer = message.retailer;
+        console.log(`[NutriScore SW] Cart cleared for ${retailer}`);
+        if (NutriScoreDB.clearCartItems) {
+          await NutriScoreDB.clearCartItems(retailer);
+        }
+        chrome.runtime.sendMessage({ action: "CART_UPDATED" }).catch(() => {});
+      } catch (err) {
+        console.error("CART_CLEARED failed:", err);
+      }
+    })();
+    return true;
+  }
+
+  if (message.action === "ORDER_PLACED") {
+    (async () => {
+      await initializeDatabases();
+      try {
+        const retailer = message.retailer;
+        console.log(`[NutriScore SW] Order placed for ${retailer} -- marking items purchased`);
+        if (NutriScoreDB.markCartPurchased) {
+          await NutriScoreDB.markCartPurchased(retailer);
+        }
+        chrome.runtime.sendMessage({ action: "CART_UPDATED" }).catch(() => {});
+      } catch (err) {
+        console.error("ORDER_PLACED failed:", err);
+      }
+    })();
     return true;
   }
 });

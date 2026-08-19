@@ -51,6 +51,24 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
   console.error('Failed to set auth persistence:', error);
 });
 
+// --- Sync signed-in state and health profile to the NutriScore extension ---
+// The extension's background.js listens for these via onMessageExternal
+// (see extension/manifest.json's "externally_connectable"). Sending is
+// best-effort: if the extension isn't installed, sendMessage just fails
+// silently and we swallow the resulting chrome.runtime.lastError.
+const EXTENSION_ID = 'eoghbaggofgoomocdmhapoifginfbiga'; // dev-unpacked ID — update if publishing changes it
+
+function syncToExtension(message) {
+  if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) return;
+  try {
+    chrome.runtime.sendMessage(EXTENSION_ID, message, () => {
+      void chrome.runtime.lastError; // extension not installed — ignore
+    });
+  } catch (e) {
+    // Messaging unsupported in this context — ignore
+  }
+}
+
 // Track the currently signed-in user's UID (null when signed out)
 let currentUserId = null;
 // Also keep the current Firebase `User` object when signed in
@@ -97,6 +115,10 @@ async function completeSignIn(user) {
   }
 
   updateAccountUI(true);
+  syncToExtension({
+    type: 'AUTH_SYNC',
+    user: { id: user.uid, email: user.email || '', picture: user.photoURL || '' }
+  });
   await loadHealthPreferencesFromFirestore(currentUserId);
 }
 
@@ -114,6 +136,7 @@ async function silentlySignOut() {
   currentUserId = null;
   currentUser = null;
   try { localStorage.removeItem('nutriscoreUser'); } catch (e) {}
+  syncToExtension({ type: 'AUTH_SYNC', user: null });
   updateAccountUI(false);
 }
 
@@ -171,6 +194,8 @@ function signOutUser() {
     currentUserId = null;
     currentUser = null;
     try { localStorage.removeItem('nutriscoreUser'); } catch (e) {}
+    syncToExtension({ type: 'AUTH_SYNC', user: null });
+    syncToExtension({ type: 'HEALTH_SYNC', health: null });
     applyStoredPreferences({ conditions: [], dietaryPreferences: [] });
     updateAccountUI(false);
     showStatus('Signed out.');
@@ -257,6 +282,7 @@ async function saveHealthPreferencesToFirestore() {
   try {
     // Path: users/{uid}/settings/health — one health doc per user
     await setDoc(doc(db, 'users', currentUserId, 'settings', 'health'), preferences);
+    syncToExtension({ type: 'HEALTH_SYNC', health: preferences });
     showStatus('Health profile saved to your account.');
   } catch (error) {
     console.error('Failed to save health preferences to Firestore:', error);
@@ -273,6 +299,7 @@ async function loadHealthPreferencesFromFirestore(uid) {
     const snap = await getDoc(doc(db, 'users', uid, 'settings', 'health'));
     if (snap.exists()) {
       applyStoredPreferences(snap.data());
+      syncToExtension({ type: 'HEALTH_SYNC', health: snap.data() });
     }
   } catch (error) {
     console.error('Failed to load health preferences from Firestore:', error);

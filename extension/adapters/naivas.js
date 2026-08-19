@@ -8,22 +8,34 @@ const NaivasAdapter = {
     return "NAIVAS";
   },
 
-  // No confirmed selector yet for Naivas' actual cart page/list (the
-  // Carrefour equivalent, #entries-SLOTTED, was found via a live
-  // DevTools inspection -- Naivas hasn't had the same check done).
-  // Returns false for now, so cart-page logging simply doesn't fire
-  // here yet rather than risk logging things that aren't really in
-  // the cart. Same diagnostic approach as Carrefour would confirm the
-  // real container if/when needed.
+  // Confirmed real container for the cart page's line items (found via
+  // live DevTools inspection, same approach as Carrefour's entries-SLOTTED).
+  // Distinct from the "Frequently Purchased" carousel below it, which uses
+  // ordinary grid-card markup and would otherwise get matched instead.
+  // The cart-wrapper class combo (rounded box, padding, flex-column, gap-4)
+  // is a generic Tailwind card style -- nothing guarantees it's unique to
+  // the cart page alone. Gating on the URL too means a coincidental match
+  // elsewhere on the site can never hijack detection away from normal
+  // product-grid scanning.
+  _onCartUrl() {
+    return /\/cart(\/|$|\?)/.test(location.pathname);
+  },
+
   isCartPage() {
-    return false;
+    return this._onCartUrl() && !!document.querySelector(".bg-naivas-gray-light.rounded-xl.flex.flex-col.gap-4");
   },
 
   getObserveTarget() {
-    return document.querySelector(".products.wrapper.grid.products-grid") || document.querySelector(".page-main") || document.body;
+    return (this._onCartUrl() && document.querySelector(".bg-naivas-gray-light.rounded-xl.flex.flex-col.gap-4"))
+      || document.querySelector(".products.wrapper.grid.products-grid") || document.querySelector(".page-main") || document.body;
   },
 
   detectProducts() {
+    const cartWrapper = this._onCartUrl()
+      ? document.querySelector(".bg-naivas-gray-light.rounded-xl.flex.flex-col.gap-4")
+      : null;
+    if (cartWrapper) return this.detectCartItems(cartWrapper);
+
     const products = [];
     const productSelector = "[class*='border-naivas-bg'], .product-item";
     const nameSelector = "span.line-clamp-2, [class*='line-clamp'], .product-item-name a, a[href*='.html'], h3, h4";
@@ -60,6 +72,26 @@ const NaivasAdapter = {
       const id = card.getAttribute("data-product-id") || card.getAttribute("data-sku") || null;
       const hash = card.getAttribute("data-original-hash") || null;
 
+      // Pull the URL from the anchor that actually wraps the product name
+      // (nameEl), not just "the first a[href] in the card". Naivas cards
+      // also contain a wishlist-heart anchor (href="javascript:void(0)")
+      // that appears earlier in the DOM than the real product link -- a
+      // blind card.querySelector("a[href]") grabs that instead, and since
+      // every card's wishlist anchor has the identical "javascript:void(0)"
+      // href, every product on the page ended up sharing the same url and
+      // therefore the same product_cache key in db.js, causing every badge
+      // after the first to silently display the first scanned product's
+      // info (Aug 2026).
+      let productUrl = null;
+      const nameAnchor = nameEl?.closest ? nameEl.closest("a[href]") : null;
+      if (nameAnchor && !/^javascript:/i.test(nameAnchor.getAttribute("href") || "")) {
+        productUrl = nameAnchor.href;
+      } else {
+        const realLink = [...card.querySelectorAll("a[href]")]
+          .find(a => !/^javascript:/i.test(a.getAttribute("href") || ""));
+        productUrl = realLink ? realLink.href : null;
+      }
+
       products.push({
         domElement: card,
         id: id,
@@ -67,11 +99,78 @@ const NaivasAdapter = {
         nameHash: hash,
         price: priceNumeric,
         scrapedCategory: pageCategory,
-        url: card.querySelector("a[href]")?.href || null
+        url: productUrl
       });
     });
 
     return products;
+  },
+
+  // Cart page line items don't share the grid card's classes, so they need
+  // their own extraction: the product ID only exists inside a Livewire
+  // wire:click attribute (e.g. redirectToProductPage(9350)), the name is
+  // the linked anchor's title, and price is the ".font-extrabold" KES
+  // figure -- confirmed against the real cart DOM (Aug 2026).
+  detectCartItems(cartWrapper) {
+    const products = [];
+    const items = [...cartWrapper.children].filter(el => el.tagName === "DIV");
+
+    items.forEach(card => {
+      const linkEl = card.querySelector('a[wire\\:click*="redirectToProductPage"]');
+      let id = null;
+      if (linkEl) {
+        const wireClick = linkEl.getAttribute("wire:click") || "";
+        const match = wireClick.match(/redirectToProductPage\((\d+)\)/);
+        if (match) id = match[1];
+      }
+      if (!id) return;
+
+      const name = linkEl.getAttribute("title") || linkEl.textContent?.trim() || "";
+      if (!name) return;
+
+      let priceNumeric = 0;
+      const priceEl = card.querySelector(".font-extrabold");
+      if (priceEl) {
+        priceNumeric = parseFloat((priceEl.textContent || "").replace(/[^0-9.]/g, "")) || 0;
+      }
+
+      products.push({
+        domElement:      card,
+        id:              id,
+        name:            name,
+        nameHash:        null,
+        price:           priceNumeric,
+        scrapedCategory: "",
+        url:             null
+      });
+    });
+
+    return products;
+  },
+
+  extractCartState() {
+    const cartWrapper = this._onCartUrl()
+      ? document.querySelector(".bg-naivas-gray-light.rounded-xl.flex.flex-col.gap-4")
+      : null;
+    if (!cartWrapper) return null;
+
+    return this.detectCartItems(cartWrapper).map(product => {
+      const quantityEl = product.domElement.querySelector(
+        "input[name*='qty' i], input[type='number'], [data-quantity], [data-qty]"
+      );
+      const rawQuantity = quantityEl?.value
+        || quantityEl?.getAttribute("data-quantity")
+        || quantityEl?.getAttribute("data-qty")
+        || "1";
+      const quantity = Math.max(1, parseInt(rawQuantity, 10) || 1);
+
+      return {
+        productId: String(product.id),
+        product_name: product.name,
+        quantity,
+        priceSnapshot: product.price || null
+      };
+    });
   },
 
   // Climbs up from a detected product element to find the actual
@@ -105,15 +204,33 @@ const NaivasAdapter = {
     // stacking duplicates.
     card.querySelectorAll(".nutriscore-isolated-root").forEach(el => el.remove());
 
-    const anchorEl = this.findRowAnchor(card);
-    if (anchorEl !== card) {
-      const currentPosition = getComputedStyle(anchorEl).position;
-      if (currentPosition === "static") anchorEl.style.position = "relative";
+    const inCart = this._onCartUrl() && !!card.closest(".bg-naivas-gray-light.rounded-xl.flex.flex-col.gap-4");
+    const nameLinkEl = inCart
+      ? card.querySelector('a.font-semibold[wire\\:click*="redirectToProductPage"]')
+      : null;
+
+    let anchorEl = card;
+    let badgeStyle;
+
+    if (inCart && nameLinkEl) {
+      // Inline, right next to the product name -- not a corner overlay --
+      // per how the cart row is actually read (name-led, not image-led).
+      badgeStyle = "display:inline-flex;vertical-align:middle;margin-left:8px;position:static;";
+    } else {
+      anchorEl = this.findRowAnchor(card);
+      const anchorStyle = getComputedStyle(anchorEl);
+      if (anchorStyle.position === "static") anchorEl.style.position = "relative";
+      // See carrefour.js injectBadge for why this matters: without an
+      // explicit z-index the anchor never forms its own stacking context,
+      // so the badge's z-index is compared against the whole page (sticky
+      // header, nav, etc.) instead of being contained within the card.
+      if (anchorStyle.zIndex === "auto") anchorEl.style.zIndex = "0";
+      badgeStyle = "position:absolute;top:36px;left:8px;z-index:2;";
     }
 
     const badgeContainer = document.createElement("div");
     badgeContainer.className = "nutriscore-isolated-root";
-    badgeContainer.style.cssText = "position:absolute;top:8px;right:8px;z-index:1000;";
+    badgeContainer.style.cssText = badgeStyle;
 
     const shadow = badgeContainer.attachShadow({ mode: "open" });
 
@@ -125,8 +242,14 @@ const NaivasAdapter = {
       E: { bg: "#e63b2e", txt: "#ffffff", label: "Very Poor" },
     };
 
-    const grade  = (productResult.nutriscore_grade || "C").toUpperCase();
-    const info   = gradeColors[grade] || gradeColors.C;
+    const rawGrade = (productResult.nutriscore_grade || "UNKNOWN").toUpperCase();
+    // A product with no score (UNKNOWN/NULL -- e.g. excluded categories or
+    // unmatched items) must never silently fall back to gradeColors.C: that
+    // renders as a real yellow "Moderate" badge, which misrepresents an
+    // unscored product as an actually-scored moderate one.
+    const isNoData = rawGrade === "UNKNOWN" || rawGrade === "NULL" || !gradeColors[rawGrade];
+    const grade = isNoData ? "—" : rawGrade;
+    const info  = isNoData ? { bg: "#e0e0e0", txt: "#555555", label: "No data" } : gradeColors[grade];
     const name   = this.escapeHTML(productResult.product_name || "");
     const prof   = productResult.nutritional_profile_display || {};
     const diseaseWarnings = productResult.diseaseWarnings || [];
@@ -182,6 +305,10 @@ const NaivasAdapter = {
         transition:transform .15s;user-select:none;
       }
       .badge-trigger:hover{transform:scale(1.05)}
+      .badge-trigger.badge-nodata{
+        width:auto;padding:0 8px;border-radius:8px;font-size:10px;font-weight:700;
+        letter-spacing:.2px;
+      }
       .flyout{
         display:none;position:absolute;top:calc(100% + 6px);left:0;
         width:268px;background:#fff;border-radius:10px;
@@ -232,12 +359,12 @@ const NaivasAdapter = {
     shadow.adoptedStyleSheets = [this.sharedStyleSheet];
 
     shadow.innerHTML = `
-      <div class="badge-trigger" style="--ns-bg: ${info.bg}; --ns-txt: ${info.txt};" title="NutriScore ${grade} — ${info.label}">${grade}</div>
+      <div class="badge-trigger${isNoData ? ' badge-nodata' : ''}" style="--ns-bg: ${info.bg}; --ns-txt: ${info.txt};" title="NutriScore ${isNoData ? 'No data' : grade + ' — ' + info.label}">${isNoData ? 'No data' : grade}</div>
       <div class="flyout">
         <button class="ns-close" style="display:none"></button>
         <div class="ns-header" style="--ns-bg: ${info.bg}; --ns-txt: ${info.txt};">
           <div class="ns-header-name">${name}</div>
-          <div class="ns-header-grade">NutriScore ${grade} — ${info.label}</div>
+          <div class="ns-header-grade">${isNoData ? 'No NutriScore data available' : 'NutriScore ' + grade + ' — ' + info.label}</div>
         </div>
         <div class="ns-section-title">Per 100g / 100ml</div>
         ${nutriRowsHTML}
@@ -249,15 +376,29 @@ const NaivasAdapter = {
     const trigger = shadow.querySelector(".badge-trigger");
     const flyout  = shadow.querySelector(".flyout");
 
+    const restingZ = anchorEl.style.zIndex;
     trigger.addEventListener("click", e => {
       e.preventDefault(); e.stopPropagation();
+      const willOpen = !flyout.classList.contains("open");
       flyout.classList.toggle("open");
+      // The anchor's z-index:0 (set above) keeps the badge contained under
+      // page chrome, but it also means sibling cards -- which get the same
+      // treatment -- can paint over an open flyout that spills past its own
+      // card's edge. Temporarily outrank siblings only while open.
+      anchorEl.style.zIndex = willOpen ? "30" : restingZ;
     });
     const closeBtn = shadow.querySelector(".ns-close");
-    if (closeBtn) closeBtn.addEventListener("click", () => flyout.classList.remove("open"));
+    if (closeBtn) closeBtn.addEventListener("click", () => {
+      flyout.classList.remove("open");
+      anchorEl.style.zIndex = restingZ;
+    });
 
     card.setAttribute("data-nutriscore-id", productResult.productId || "");
-    anchorEl.appendChild(badgeContainer);
+    if (inCart && nameLinkEl) {
+      nameLinkEl.insertAdjacentElement("afterend", badgeContainer);
+    } else {
+      anchorEl.appendChild(badgeContainer);
+    }
     return shadow;
   },
 
@@ -290,4 +431,4 @@ const NaivasAdapter = {
   }
 };
 
-window.RetailerAdapter = NaivasAdapter;
+window.RetailerAdapter = NaivasAdapter;u

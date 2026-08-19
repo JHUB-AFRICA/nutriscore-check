@@ -1,0 +1,65 @@
+/* NutriScore popup — theme override to match the public site without
+   touching the compiled React bundle. Loaded after the compiled CSS. */
+
+:root {
+  --primary: #1d6b45;
+  --primary-foreground: #ffffff;
+  --background: #f5f1e8;
+  --foreground: #17251d;
+  --card: #fffdf8;
+  --card-foreground: #17251d;
+  --muted: #e9f3e5;
+  --muted-foreground: #607064;
+  --accent: #e4f1df;
+  --accent-foreground: #17251d;
+  --border: rgba(23, 37, 29, 0.14);
+  --input: rgba(23, 37, 29, 0.14);
+  --ring: #1d6b45;
+  --radius: 0;
+}
+
+/* Square off the card, rows, and buttons while keeping the avatar round. */
+#root .rounded-lg,
+#root .rounded-md,
+#root .rounded-xl {
+  border-radius: 0 !important;
+}
+
+html, body, #root {
+  font-family: 'Trebuchet MS', 'Segoe UI', sans-serif !important;
+}
+
+body {
+  background:
+    radial-gradient(circle at 8% 4%, rgba(227, 111, 79, 0.12), transparent 24rem),
+    radial-gradient(circle at 92% 30%, rgba(29, 107, 69, 0.1), transparent 28rem),
+    var(--background) !important;
+  color: var(--foreground) !important;
+}
+
+#root > div {
+  background: linear-gradient(180deg, rgba(228, 241, 223, 0.72), #fffdf8 72px) !important;
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 30px rgba(29, 107, 69, 0.09);
+}
+
+/* The "N" logo mark: swap the flat grade-green fill for the site's
+   diagonal green gradient + a matching soft shadow. (Nested one level
+   deeper than before — the logo+title are now wrapped in their own
+   container alongside the health-details button.) */
+#root > div > div:first-child > div:first-child > div:first-child {
+  background: linear-gradient(135deg, #1d6b45, #5b9b6f) !important;
+  box-shadow: 0 8px 18px rgba(29, 107, 69, 0.22);
+}
+
+/* Retint the neutral information rows to the site's soft green surface. */
+.bg-\[\#f6f7f9\] {
+  background-color: #e9f3e5 !important;
+}
+
+#root button {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+#root button:hover {
+  transform: translateY(-1px);
+}
