@@ -1,9 +1,18 @@
 name: Build and Push Docker Image
 
+# Builds the website (webpage/) once and publishes it under all the
+# tags anything might depend on, so they never drift apart.
+#
+# IMPORTANT: this image is deployed in production from the
+# `nutriscore-check:latest` tag — do not remove that tag without
+# confirming with whoever manages that deployment first.
 on:
   push:
     branches:
-      - main   # change this to whichever branch should trigger a build
+      - main
+    paths:
+      - "webpage/**"
+      - ".github/workflows/docker-publish.yml"
 
 jobs:
   build-and-push:
@@ -24,11 +33,11 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./Dockerfile
+          context: ./webpage
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/nutriscore-check:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/nutriscore-check:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/nutriscore-check:web-latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
